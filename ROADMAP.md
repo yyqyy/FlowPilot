@@ -11,9 +11,11 @@
 
 ## 0.2 — Screen-aware automation
 
-- [ ] Region screenshot overlay
-- [ ] OpenCV template matching with confidence preview
-- [ ] Click matched image center or configured offset
+- [x] Region screenshot overlay for the primary display
+- [x] OpenCV template matching with confidence result
+- [x] Click matched image center
+- [ ] Multi-monitor region capture
+- [ ] Configured click offset
 - [ ] Retry, timeout, and not-found branches
 
 ## 0.3 — Reusable workflows
@@ -29,4 +31,3 @@
 - [ ] Workflow permission manifest
 - [ ] Plugin API and documentation
 - [ ] English and Simplified Chinese interface
-

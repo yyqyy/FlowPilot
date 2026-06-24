@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 import sys
+from datetime import datetime
 
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, QTimer
 from PySide6.QtGui import QAction, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
+    QFileDialog,
     QGraphicsItem,
     QGraphicsRectItem,
     QGraphicsScene,
@@ -17,7 +20,9 @@ from PySide6.QtWidgets import (
 )
 
 from flowpilot.executor import WorkflowExecutor
+from flowpilot.capture import CaptureOverlay
 from flowpilot.model import Edge, Node, NodeKind, Workflow
+from flowpilot.screen import ScreenMatcher
 
 
 NODE_COLORS = {
@@ -96,6 +101,12 @@ class MainWindow(QMainWindow):
         run = QAction("▶ Run dry", self)
         run.triggered.connect(self.run_dry)
         toolbar.addAction(run)
+        test_image = QAction("◎ Test image", self)
+        test_image.triggered.connect(self.test_image)
+        toolbar.addAction(test_image)
+        capture_image = QAction("▣ Capture template", self)
+        capture_image.triggered.connect(self.capture_template)
+        toolbar.addAction(capture_image)
         toolbar.addSeparator()
         for kind, label in [
             (NodeKind.FIND_IMAGE, "+ Find image"),
@@ -129,6 +140,66 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Workflow error", str(exc))
             return
         QMessageBox.information(self, "Dry-run result", "\n".join(messages))
+
+    def test_image(self) -> None:
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose a template image",
+            "",
+            "Images (*.png *.jpg *.jpeg *.bmp)",
+        )
+        if not filename:
+            return
+        try:
+            result = ScreenMatcher().find_template(Path(filename), threshold=0.8)
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(self, "Image match failed", str(exc))
+            return
+        if result is None:
+            QMessageBox.warning(self, "No match", "The image was not found on the screen.")
+            return
+        QMessageBox.information(
+            self,
+            "Match found",
+            f"Center: {result.center[0]}, {result.center[1]}\n"
+            f"Confidence: {result.confidence:.1%}",
+        )
+
+    def capture_template(self) -> None:
+        self.statusBar().showMessage("FlowPilot will hide; drag a box around the target image")
+        self.hide()
+        QTimer.singleShot(700, self._open_capture_overlay)
+
+    def _open_capture_overlay(self) -> None:
+        overlay = CaptureOverlay()
+        selected = []
+        overlay.captured.connect(selected.append)
+        overlay.exec()
+        self.show()
+        self.activateWindow()
+        if not selected:
+            self.statusBar().showMessage("Capture cancelled")
+            return
+
+        template_dir = Path.cwd() / "assets" / "templates"
+        template_dir.mkdir(parents=True, exist_ok=True)
+        filename = datetime.now().strftime("template-%Y%m%d-%H%M%S.png")
+        template_path = template_dir / filename
+        if not selected[0].save(str(template_path), "PNG"):
+            QMessageBox.critical(self, "Capture failed", f"Could not save {template_path}")
+            return
+
+        center = self.view.mapToScene(self.view.viewport().rect().center())
+        node = Node(
+            NodeKind.FIND_IMAGE,
+            "Find captured image",
+            center.x(),
+            center.y(),
+            {"template": str(template_path), "threshold": 0.85},
+        )
+        self.workflow.nodes.append(node)
+        self.scene.addItem(NodeItem(node))
+        self.statusBar().showMessage(f"Saved template: {template_path.name}")
 
 
 def main() -> int:

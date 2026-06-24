@@ -9,4 +9,4 @@ build/
 *.egg-info/
 *.flowpilot.local.json
 captures/
-
+assets/templates/*.png
