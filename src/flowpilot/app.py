@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 import sys
 
 from PySide6.QtCore import QPointF
 from PySide6.QtGui import QAction, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
+    QFileDialog,
     QGraphicsItem,
     QGraphicsRectItem,
     QGraphicsScene,
@@ -18,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from flowpilot.executor import WorkflowExecutor
 from flowpilot.model import Edge, Node, NodeKind, Workflow
+from flowpilot.screen import ScreenMatcher
 
 
 NODE_COLORS = {
@@ -96,6 +99,9 @@ class MainWindow(QMainWindow):
         run = QAction("▶ Run dry", self)
         run.triggered.connect(self.run_dry)
         toolbar.addAction(run)
+        test_image = QAction("◎ Test image", self)
+        test_image.triggered.connect(self.test_image)
+        toolbar.addAction(test_image)
         toolbar.addSeparator()
         for kind, label in [
             (NodeKind.FIND_IMAGE, "+ Find image"),
@@ -129,6 +135,30 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Workflow error", str(exc))
             return
         QMessageBox.information(self, "Dry-run result", "\n".join(messages))
+
+    def test_image(self) -> None:
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose a template image",
+            "",
+            "Images (*.png *.jpg *.jpeg *.bmp)",
+        )
+        if not filename:
+            return
+        try:
+            result = ScreenMatcher().find_template(Path(filename), threshold=0.8)
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(self, "Image match failed", str(exc))
+            return
+        if result is None:
+            QMessageBox.warning(self, "No match", "The image was not found on the screen.")
+            return
+        QMessageBox.information(
+            self,
+            "Match found",
+            f"Center: {result.center[0]}, {result.center[1]}\n"
+            f"Confidence: {result.confidence:.1%}",
+        )
 
 
 def main() -> int:
