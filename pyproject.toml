@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flowpilot-automation"
+version = "0.1.0"
+description = "A visual, node-based desktop automation studio."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "FlowPilot contributors" }]
+dependencies = [
+  "PySide6>=6.8",
+  "mss>=10.0",
+  "numpy>=2.0",
+  "opencv-python>=4.10",
+  "pyautogui>=0.9.54",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.9"]
+
+[project.scripts]
+flowpilot = "flowpilot.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flowpilot"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
