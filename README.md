@@ -4,8 +4,8 @@ FlowPilot is an open-source visual desktop automation studio. Build reusable wor
 dragging nodes, connecting them, and configuring actions such as screenshot matching, mouse
 clicks, text input, random delays, conditions, and loops.
 
-> Status: early MVP. Workflows run in **dry-run mode by default** so a new graph cannot take
-> control of the mouse or keyboard unexpectedly.
+> Status: early MVP. The editor and screen matching work, but graph connections and the property
+> inspector are still under development. Workflows run in **dry-run mode by default**.
 
 ## Why FlowPilot?
 
@@ -13,14 +13,23 @@ Many automation tools are either code-only or tied to fixed coordinates. FlowPil
 screen-aware automation understandable and editable by non-programmers while keeping workflows
 portable and reviewable as JSON files.
 
-## Planned MVP nodes
+## Current build
 
-- Start and Stop
-- Capture region and find image with OpenCV
-- Click image or fixed position
-- Type text and press hotkeys
-- Fixed or randomized delay
-- Condition, loop, and variable nodes
+- Drag nodes around an infinite canvas.
+- Capture a screen region and create a template node from it.
+- Match a template on the desktop with OpenCV and report its coordinates and confidence.
+- Run a sequential workflow in dry-run mode.
+- Execute fixed-position clicks, matched-image clicks, and text input when dry-run is disabled.
+- Add fixed or randomized delays.
+
+The capture overlay currently uses the primary display. Multi-monitor capture is tracked for a
+later milestone.
+
+## Try it
+
+Start FlowPilot, select **Capture template**, and drag around a small target on the screen. The
+captured image is stored under `assets/templates` and a configured image node is added to the
+canvas. Use **Test image** to check whether a saved template can be found on the current desktop.
 
 ## Safety and responsible use
 
@@ -39,6 +48,8 @@ flowpilot
 
 Run tests with `pytest`.
 
+Contribution notes are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md). Contributions and real-world, permission-safe workflow examples
@@ -47,4 +58,3 @@ are welcome.
 ## License
 
 MIT
-
