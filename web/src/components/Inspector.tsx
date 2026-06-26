@@ -1,4 +1,7 @@
-import { useStore } from '../store'
+import { useRef } from 'react'
+import { ImagePlus } from 'lucide-react'
+
+import { useStore, type FlowNode } from '../store'
 import { NODE_META, type ClickTarget } from '../types'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -7,6 +10,84 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="fp-field-label">{label}</span>
       {children}
     </label>
+  )
+}
+
+function FindImageFields({ node }: { node: FlowNode }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const updateConfig = useStore((s) => s.updateConfig)
+  const setNodeImage = useStore((s) => s.setNodeImage)
+  const clearNodeImage = useStore((s) => s.clearNodeImage)
+  const config = node.data.config
+  const dataUrl = String(config.templateData ?? '')
+  const name = String(config.template ?? '')
+  const threshold = Number(config.threshold ?? 0.85)
+
+  const onPick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setNodeImage(node.id, file.name, String(reader.result))
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <>
+      <Field label="模板图片">
+        {dataUrl ? (
+          <div className="fp-image-preview">
+            <img src={dataUrl} alt={name} />
+            <div className="fp-image-meta">
+              <span className="fp-image-name" title={name}>
+                {name || '已嵌入图片'}
+              </span>
+              <div className="fp-image-actions">
+                <button type="button" className="fp-link" onClick={() => fileRef.current?.click()}>
+                  更换
+                </button>
+                <button
+                  type="button"
+                  className="fp-link fp-link-danger"
+                  onClick={() => clearNodeImage(node.id)}
+                >
+                  移除
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="fp-image-drop" onClick={() => fileRef.current?.click()}>
+            <ImagePlus size={18} />
+            <span>点击选择图片，或把图片拖到画布上</span>
+          </button>
+        )}
+        <input ref={fileRef} type="file" accept="image/*" className="fp-hidden" onChange={onPick} />
+      </Field>
+
+      {!dataUrl && (
+        <Field label="或图片路径（可选）">
+          <input
+            className="fp-input"
+            placeholder="例如 C:\imgs\button.png"
+            value={name}
+            onChange={(e) => updateConfig(node.id, 'template', e.target.value)}
+          />
+        </Field>
+      )}
+
+      <Field label={`置信度 ${Math.round(threshold * 100)}%`}>
+        <input
+          className="fp-range"
+          type="range"
+          min={0.5}
+          max={1}
+          step={0.01}
+          value={threshold}
+          onChange={(e) => updateConfig(node.id, 'threshold', Number(e.target.value))}
+        />
+      </Field>
+    </>
   )
 }
 
@@ -43,29 +124,7 @@ export function Inspector() {
         />
       </Field>
 
-      {kind === 'find_image' && (
-        <>
-          <Field label="模板图片路径">
-            <input
-              className="fp-input"
-              placeholder="例如 assets/templates/button.png"
-              value={String(config.template ?? '')}
-              onChange={(e) => updateConfig(node.id, 'template', e.target.value)}
-            />
-          </Field>
-          <Field label={`置信度 ${Math.round(Number(config.threshold ?? 0.85) * 100)}%`}>
-            <input
-              className="fp-range"
-              type="range"
-              min={0.5}
-              max={1}
-              step={0.01}
-              value={Number(config.threshold ?? 0.85)}
-              onChange={(e) => updateConfig(node.id, 'threshold', Number(e.target.value))}
-            />
-          </Field>
-        </>
-      )}
+      {kind === 'find_image' && <FindImageFields node={node} />}
 
       {kind === 'click' && (
         <>

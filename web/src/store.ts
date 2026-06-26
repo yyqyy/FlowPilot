@@ -54,6 +54,9 @@ interface StoreState {
   onConnect: (connection: Connection) => void
 
   addNode: (kind: NodeKind, position: { x: number; y: number }) => void
+  addImageNode: (name: string, dataUrl: string, position: { x: number; y: number }) => void
+  setNodeImage: (id: string, name: string, dataUrl: string) => void
+  clearNodeImage: (id: string) => void
   updateConfig: (id: string, key: string, value: unknown) => void
   renameNode: (id: string, title: string) => void
   removeSelected: () => void
@@ -131,6 +134,47 @@ export const useStore = create<StoreState>((set, get) => ({
 
   addNode: (kind, position) =>
     set((s) => ({ nodes: [...s.nodes, makeNode(kind, position)], dirty: true })),
+
+  addImageNode: (name, dataUrl, position) =>
+    set((s) => {
+      const node: FlowNode = {
+        id: newId('find_image'),
+        type: 'flow',
+        position,
+        data: {
+          kind: 'find_image',
+          title: name ? `找图：${name}` : 'Find image',
+          config: { template: name, templateData: dataUrl, threshold: 0.85 },
+        },
+      }
+      return { nodes: [...s.nodes, node], dirty: true }
+    }),
+
+  setNodeImage: (id, name, dataUrl) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                config: { ...n.data.config, template: name, templateData: dataUrl },
+              },
+            }
+          : n,
+      ),
+      dirty: true,
+    })),
+
+  clearNodeImage: (id) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        n.id === id
+          ? { ...n, data: { ...n.data, config: { ...n.data.config, template: '', templateData: '' } } }
+          : n,
+      ),
+      dirty: true,
+    })),
 
   updateConfig: (id, key, value) =>
     set((s) => ({

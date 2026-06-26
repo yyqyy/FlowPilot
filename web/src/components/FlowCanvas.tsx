@@ -1,9 +1,11 @@
+import { useCallback, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
   Controls,
   MiniMap,
   ReactFlow,
+  useReactFlow,
   type NodeTypes,
 } from '@xyflow/react'
 
@@ -23,9 +25,50 @@ export function FlowCanvas() {
   const onNodesChange = useStore((s) => s.onNodesChange)
   const onEdgesChange = useStore((s) => s.onEdgesChange)
   const onConnect = useStore((s) => s.onConnect)
+  const addImageNode = useStore((s) => s.addImageNode)
+  const { screenToFlowPosition } = useReactFlow()
+  const [dropping, setDropping] = useState(false)
+
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    if (Array.from(event.dataTransfer.items).some((i) => i.kind === 'file')) {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'copy'
+      setDropping(true)
+    }
+  }, [])
+
+  const onDragLeave = useCallback((event: React.DragEvent) => {
+    if (event.currentTarget === event.target) setDropping(false)
+  }, [])
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault()
+      setDropping(false)
+      const images = Array.from(event.dataTransfer.files).filter((f) => f.type.startsWith('image/'))
+      if (images.length === 0) return
+      const origin = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+      images.forEach((file, index) => {
+        const reader = new FileReader()
+        reader.onload = () =>
+          addImageNode(file.name, String(reader.result), {
+            x: origin.x + index * 32,
+            y: origin.y + index * 32,
+          })
+        reader.readAsDataURL(file)
+      })
+    },
+    [screenToFlowPosition, addImageNode],
+  )
 
   return (
-    <div className="fp-canvas">
+    <div
+      className={`fp-canvas${dropping ? ' is-dropping' : ''}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {dropping && <div className="fp-drop-hint">松手即可创建图片节点</div>}
       <ReactFlow
         nodes={nodes}
         edges={edges}

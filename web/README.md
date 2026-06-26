@@ -45,6 +45,14 @@ Node types map to the script as follows:
 | Type text | `pyautogui.write` |
 | Delay | `time.sleep(random.uniform(min, max))` |
 
+### Template images
+
+Pick an image with the inspector button, or drag an image file onto the canvas to drop in a
+ready-made Find image node. Browsers cannot expose a selected file's real path, so the picked image
+is **embedded** into the workflow (base64) and decoded in memory by the exported script
+(`cv2.imdecode`) — no path is needed and the script stays self-contained. You can still type an
+on-disk path instead, which the script reads with `cv2.imread`.
+
 The script enables PyAutoGUI's fail-safe: slam the mouse into a screen corner to abort. It also
 waits 3 seconds before the first action so you can switch to the target window.
 

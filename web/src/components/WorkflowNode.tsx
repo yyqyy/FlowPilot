@@ -25,6 +25,7 @@ function configSummary(data: WorkflowNodeData): string {
 
 export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
   const meta = NODE_META[data.kind]
+  const thumb = data.kind === 'find_image' ? String(data.config.templateData ?? '') : ''
   return (
     <div
       className="fp-node"
@@ -44,6 +45,7 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
           {meta.label}
         </div>
         <div className="fp-node-summary">{configSummary(data)}</div>
+        {thumb && <img className="fp-node-thumb" src={thumb} alt="" draggable={false} />}
       </div>
       {meta.hasOutput && (
         <Handle type="source" position={Position.Right} className="fp-handle" />
