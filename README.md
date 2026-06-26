@@ -17,18 +17,37 @@ runs them against the real desktop and listens for **global hotkeys** to start/s
 - The browser only edits and controls; the engine does the automation. Nothing is "exported" — your
   tasks live in the engine and run there.
 
-## Run it
+## Run it (Windows)
+
+One command — sets everything up on first run, then starts the engine and opens the browser:
+
+```powershell
+.\start.ps1
+```
+
+`start.ps1` creates the virtual environment, installs dependencies, builds the web UI on first run,
+and launches the engine at **http://127.0.0.1:8765**. Use `.\start.ps1 -Rebuild` after changing the
+web UI. Press `Ctrl+C` in the terminal to stop.
+
+<details>
+<summary>Manual steps (or non-Windows)</summary>
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
-flowpilot-studio          # serves the UI + engine at http://127.0.0.1:8765
+cd web; npm install; npm run build; cd ..   # build the UI once
+flowpilot-studio                            # serves UI + engine at http://127.0.0.1:8765
 ```
+
+</details>
 
 Build a task, optionally bind a start hotkey, and press it anywhere. Each task runs **once /
 multiple times / loop**; pressing the start hotkey again restarts it; the stop hotkey (or moving the
 mouse into a screen corner) aborts it. See [web/README.md](web/README.md) for the node reference.
+
+> Global hotkeys may require running the terminal as Administrator on some systems. The toolbar
+> shows whether hotkey listening is active; you can always run tasks from the ▶ button.
 
 ## Why FlowPilot?
 

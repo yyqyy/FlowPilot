@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from flowpilot.engine.manager import EngineRuntime
@@ -99,12 +99,22 @@ def create_app(runtime: EngineRuntime) -> FastAPI:
         return {"ok": True}
 
     dist = web_dist()
-    if dist.exists():
+    if (dist / "index.html").exists():
         app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
 
         @app.get("/")
         def index() -> FileResponse:
             return FileResponse(dist / "index.html")
+    else:
+
+        @app.get("/")
+        def index_missing() -> HTMLResponse:
+            return HTMLResponse(
+                "<h1>FlowPilot</h1><p>网页界面尚未构建。请在 <code>web/</code> 下运行 "
+                "<code>npm install &amp;&amp; npm run build</code>，或直接运行 "
+                "<code>start.ps1</code>。</p>",
+                status_code=200,
+            )
 
     return app
 
