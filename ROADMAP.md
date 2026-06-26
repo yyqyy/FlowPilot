@@ -5,8 +5,8 @@
 - [x] Workflow file model and validation
 - [x] Dry-run executor
 - [x] Initial visual graph canvas
-- [ ] Connect ports interactively
-- [ ] Properties inspector for every node type
+- [x] Connect ports interactively
+- [x] Properties inspector for every node type
 - [ ] Global emergency-stop hotkey
 
 ## 0.2 — Screen-aware automation

@@ -4,8 +4,9 @@ FlowPilot is an open-source visual desktop automation studio. Build reusable wor
 dragging nodes, connecting them, and configuring actions such as screenshot matching, mouse
 clicks, text input, random delays, conditions, and loops.
 
-> Status: early MVP. The editor and screen matching work, but graph connections and the property
-> inspector are still under development. Workflows run in **dry-run mode by default**.
+> Status: early MVP. The visual editor, screen matching, interactive node connections, and the
+> property inspector all work. A global emergency-stop hotkey is still under development.
+> Workflows run in **dry-run mode by default**.
 
 ## Why FlowPilot?
 
@@ -16,6 +17,9 @@ portable and reviewable as JSON files.
 ## Current build
 
 - Drag nodes around an infinite canvas.
+- Connect nodes by dragging from a node's output port to another node's input port.
+- Edit each node's properties (template, confidence, click target, text, and delays) in the
+  inspector panel.
 - Capture a screen region and create a template node from it.
 - Match a template on the desktop with OpenCV and report its coordinates and confidence.
 - Run a sequential workflow in dry-run mode.
