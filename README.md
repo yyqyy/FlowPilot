@@ -1,11 +1,26 @@
 # FlowPilot
 
-FlowPilot is an open-source visual desktop automation studio. Build reusable workflows by
-dragging nodes, connecting them, and configuring actions such as screenshot matching, mouse
-clicks, text input, random delays, conditions, and loops.
+FlowPilot is an open-source visual automation studio. Build reusable workflows by dragging nodes,
+connecting them, and configuring actions such as screenshot matching, mouse clicks, text input, and
+random delays.
 
-> Status: early MVP. The editor and screen matching work, but graph connections and the property
-> inspector are still under development. Workflows run in **dry-run mode by default**.
+> Status: early MVP. The **web editor** (`web/`) is the recommended way to build workflows — it
+> exports a self-contained Python script that runs the automation locally, fast and precise. A
+> Python desktop editor (`src/flowpilot/`) also exists and shares the same runtime concepts.
+
+## Web editor (FlowPilot Studio)
+
+The browser is the editor; the exported script is the runtime. You design a workflow visually and
+**export a standalone `*.py`** that uses OpenCV for template matching and direct input control —
+no GUI framework needed to run it.
+
+```powershell
+cd web
+npm install
+npm run dev      # http://localhost:5173
+```
+
+See [web/README.md](web/README.md) for the export format and node-to-script mapping.
 
 ## Why FlowPilot?
 

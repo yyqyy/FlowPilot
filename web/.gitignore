@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+*.tsbuildinfo
+# tsc -b emits the config shim here; keep it out of the tree
+/vite.config.js
+/vite.config.d.ts
