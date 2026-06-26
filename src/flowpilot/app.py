@@ -25,16 +25,22 @@ from flowpilot.screen import ScreenMatcher
 
 
 class GraphView(QGraphicsView):
+    MIN_ZOOM = 0.25
+    MAX_ZOOM = 3.0
+
     def __init__(self, scene: GraphScene):
         super().__init__(scene)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setBackgroundBrush(QColor("#0b1020"))
         self.setSceneRect(-2000, -2000, 4000, 4000)
 
     def wheelEvent(self, event):  # noqa: N802
         factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
-        self.scale(factor, factor)
+        new_zoom = self.transform().m11() * factor
+        if self.MIN_ZOOM <= new_zoom <= self.MAX_ZOOM:
+            self.scale(factor, factor)
 
 
 class MainWindow(QMainWindow):
@@ -51,7 +57,8 @@ class MainWindow(QMainWindow):
         self._build_editor()
         self._build_toolbar()
         self._build_inspector()
-        self._set_workflow(self.workflow)
+        self.inspector.set_node(None)
+        self._update_title()
         self.statusBar().showMessage("Dry-run mode is ON — input control is disabled")
 
     def _starter_workflow(self) -> Workflow:
@@ -65,9 +72,17 @@ class MainWindow(QMainWindow):
         )
 
     def _build_editor(self) -> None:
-        self.scene = GraphScene(self.workflow, self)
+        self.scene = self._make_scene(self.workflow)
         self.view = GraphView(self.scene)
         self.setCentralWidget(self.view)
+
+    def _make_scene(self, workflow: Workflow) -> GraphScene:
+        scene = GraphScene(workflow, self)
+        scene.setSceneRect(-2000, -2000, 4000, 4000)
+        scene.workflow_changed.connect(self._mark_dirty)
+        scene.node_selected.connect(self.inspector.set_node)
+        scene.message.connect(self.statusBar().showMessage)
+        return scene
 
     def _build_toolbar(self) -> None:
         toolbar = QToolBar("Workflow", self)
@@ -121,11 +136,7 @@ class MainWindow(QMainWindow):
     def _set_workflow(self, workflow: Workflow) -> None:
         self.workflow = workflow
         old_scene = self.scene
-        self.scene = GraphScene(workflow, self)
-        self.scene.setSceneRect(-2000, -2000, 4000, 4000)
-        self.scene.workflow_changed.connect(self._mark_dirty)
-        self.scene.node_selected.connect(self.inspector.set_node)
-        self.scene.message.connect(self.statusBar().showMessage)
+        self.scene = self._make_scene(workflow)
         self.view.setScene(self.scene)
         old_scene.deleteLater()
         self.inspector.set_node(None)
