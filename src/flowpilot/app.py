@@ -1,65 +1,31 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 import sys
-from datetime import datetime
 
-from PySide6.QtCore import QPointF, QTimer
-from PySide6.QtGui import QAction, QColor, QPainter, QPen
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QAction, QColor, QCloseEvent, QKeySequence, QPainter
 from PySide6.QtWidgets import (
     QApplication,
+    QDockWidget,
     QFileDialog,
-    QGraphicsItem,
-    QGraphicsRectItem,
-    QGraphicsScene,
-    QGraphicsTextItem,
     QGraphicsView,
     QMainWindow,
     QMessageBox,
     QToolBar,
 )
 
-from flowpilot.executor import WorkflowExecutor
 from flowpilot.capture import CaptureOverlay
+from flowpilot.executor import WorkflowExecutor
+from flowpilot.graph import GraphScene
+from flowpilot.inspector import NodeInspector
 from flowpilot.model import Edge, Node, NodeKind, Workflow
 from flowpilot.screen import ScreenMatcher
 
 
-NODE_COLORS = {
-    NodeKind.START: "#22c55e",
-    NodeKind.FIND_IMAGE: "#06b6d4",
-    NodeKind.CLICK: "#8b5cf6",
-    NodeKind.TYPE_TEXT: "#f59e0b",
-    NodeKind.DELAY: "#64748b",
-    NodeKind.STOP: "#ef4444",
-}
-
-
-class NodeItem(QGraphicsRectItem):
-    def __init__(self, node: Node):
-        super().__init__(0, 0, 180, 72)
-        self.node = node
-        self.setPos(QPointF(node.x, node.y))
-        self.setBrush(QColor("#172033"))
-        self.setPen(QPen(QColor(NODE_COLORS[node.kind]), 2))
-        self.setFlags(
-            QGraphicsItem.GraphicsItemFlag.ItemIsMovable
-            | QGraphicsItem.GraphicsItemFlag.ItemIsSelectable
-        )
-        title = QGraphicsTextItem(node.title, self)
-        title.setDefaultTextColor(QColor("#f8fafc"))
-        title.setPos(12, 10)
-        kind = QGraphicsTextItem(node.kind.value.replace("_", " "), self)
-        kind.setDefaultTextColor(QColor("#94a3b8"))
-        kind.setPos(12, 36)
-
-    def sync(self) -> None:
-        self.node.x = self.pos().x()
-        self.node.y = self.pos().y()
-
-
 class GraphView(QGraphicsView):
-    def __init__(self, scene: QGraphicsScene):
+    def __init__(self, scene: GraphScene):
         super().__init__(scene)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
@@ -76,12 +42,16 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("FlowPilot — Visual Automation Studio")
         self.resize(1180, 760)
+        self.current_path: Path | None = None
+        self.dirty = False
         self.workflow = self._starter_workflow()
-        self.scene = QGraphicsScene(self)
-        self.view = GraphView(self.scene)
-        self.setCentralWidget(self.view)
+        self.scene: GraphScene
+        self.view: GraphView
+        self.inspector = NodeInspector(self)
+        self._build_editor()
         self._build_toolbar()
-        self._render_workflow()
+        self._build_inspector()
+        self._set_workflow(self.workflow)
         self.statusBar().showMessage("Dry-run mode is ON — input control is disabled")
 
     def _starter_workflow(self) -> Workflow:
@@ -94,10 +64,33 @@ class MainWindow(QMainWindow):
             edges=[Edge(start.id, delay.id), Edge(delay.id, stop.id)],
         )
 
+    def _build_editor(self) -> None:
+        self.scene = GraphScene(self.workflow, self)
+        self.view = GraphView(self.scene)
+        self.setCentralWidget(self.view)
+
     def _build_toolbar(self) -> None:
         toolbar = QToolBar("Workflow", self)
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
+        for label, shortcut, callback in [
+            ("New", QKeySequence.StandardKey.New, self.new_workflow),
+            ("Open", QKeySequence.StandardKey.Open, self.open_workflow),
+            ("Save", QKeySequence.StandardKey.Save, self.save_workflow),
+        ]:
+            action = QAction(label, self)
+            action.setShortcut(shortcut)
+            action.triggered.connect(callback)
+            toolbar.addAction(action)
+        save_as = QAction("Save as", self)
+        save_as.setShortcut(QKeySequence.StandardKey.SaveAs)
+        save_as.triggered.connect(self.save_workflow_as)
+        toolbar.addAction(save_as)
+        delete = QAction("Delete", self)
+        delete.setShortcut(QKeySequence.StandardKey.Delete)
+        delete.triggered.connect(lambda: self.scene.delete_selected())
+        self.addAction(delete)
+        toolbar.addSeparator()
         run = QAction("▶ Run dry", self)
         run.triggered.connect(self.run_dry)
         toolbar.addAction(run)
@@ -118,21 +111,45 @@ class MainWindow(QMainWindow):
             action.triggered.connect(lambda checked=False, value=kind: self.add_node(value))
             toolbar.addAction(action)
 
-    def _render_workflow(self) -> None:
-        self.scene.clear()
-        for node in self.workflow.nodes:
-            self.scene.addItem(NodeItem(node))
+    def _build_inspector(self) -> None:
+        dock = QDockWidget("Node properties", self)
+        dock.setObjectName("node-properties")
+        dock.setWidget(self.inspector)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        self.inspector.changed.connect(self._inspector_changed)
+
+    def _set_workflow(self, workflow: Workflow) -> None:
+        self.workflow = workflow
+        old_scene = self.scene
+        self.scene = GraphScene(workflow, self)
+        self.scene.setSceneRect(-2000, -2000, 4000, 4000)
+        self.scene.workflow_changed.connect(self._mark_dirty)
+        self.scene.node_selected.connect(self.inspector.set_node)
+        self.scene.message.connect(self.statusBar().showMessage)
+        self.view.setScene(self.scene)
+        old_scene.deleteLater()
+        self.inspector.set_node(None)
+        self.dirty = False
+        self._update_title()
 
     def add_node(self, kind: NodeKind) -> None:
         center = self.view.mapToScene(self.view.viewport().rect().center())
-        node = Node(kind, kind.value.replace("_", " ").title(), center.x(), center.y())
-        self.workflow.nodes.append(node)
-        self.scene.addItem(NodeItem(node))
+        defaults = {
+            NodeKind.FIND_IMAGE: {"template": "", "threshold": 0.85},
+            NodeKind.CLICK: {"target": "fixed", "x": 0, "y": 0},
+            NodeKind.TYPE_TEXT: {"text": ""},
+            NodeKind.DELAY: {"min_seconds": 0.5, "max_seconds": 1.5},
+        }
+        node = Node(
+            kind,
+            kind.value.replace("_", " ").title(),
+            center.x(),
+            center.y(),
+            defaults.get(kind, {}),
+        )
+        self.scene.add_node(node)
 
     def run_dry(self) -> None:
-        for item in self.scene.items():
-            if isinstance(item, NodeItem):
-                item.sync()
         messages: list[str] = []
         try:
             WorkflowExecutor(self.workflow, dry_run=True, log=messages.append).run()
@@ -197,9 +214,106 @@ class MainWindow(QMainWindow):
             center.y(),
             {"template": str(template_path), "threshold": 0.85},
         )
-        self.workflow.nodes.append(node)
-        self.scene.addItem(NodeItem(node))
+        self.scene.add_node(node)
         self.statusBar().showMessage(f"Saved template: {template_path.name}")
+
+    def new_workflow(self) -> None:
+        if not self._maybe_save():
+            return
+        start = Node(NodeKind.START, "Start", 0, 0)
+        stop = Node(NodeKind.STOP, "Stop", 280, 0)
+        self.current_path = None
+        self._set_workflow(Workflow("Untitled workflow", [start, stop], [Edge(start.id, stop.id)]))
+
+    def open_workflow(self) -> None:
+        if not self._maybe_save():
+            return
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open workflow",
+            "",
+            "FlowPilot workflow (*.flowpilot.json);;JSON files (*.json)",
+        )
+        if not filename:
+            return
+        try:
+            workflow = Workflow.load(Path(filename))
+            errors = workflow.validate()
+            if errors:
+                raise ValueError("\n".join(errors))
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(self, "Could not open workflow", str(exc))
+            return
+        self.current_path = Path(filename)
+        self._set_workflow(workflow)
+        self.statusBar().showMessage(f"Opened {self.current_path.name}")
+
+    def save_workflow(self) -> bool:
+        if self.current_path is None:
+            return self.save_workflow_as()
+        try:
+            self.workflow.save(self.current_path)
+        except OSError as exc:
+            QMessageBox.critical(self, "Could not save workflow", str(exc))
+            return False
+        self.dirty = False
+        self._update_title()
+        self.statusBar().showMessage(f"Saved {self.current_path.name}")
+        return True
+
+    def save_workflow_as(self) -> bool:
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save workflow",
+            str(self.current_path or Path.cwd() / "workflow.flowpilot.json"),
+            "FlowPilot workflow (*.flowpilot.json)",
+        )
+        if not filename:
+            return False
+        path = Path(filename)
+        if not path.name.endswith(".flowpilot.json"):
+            path = path.with_name(f"{path.name}.flowpilot.json")
+        self.current_path = path
+        return self.save_workflow()
+
+    def closeEvent(self, event: QCloseEvent):  # noqa: N802
+        if self._maybe_save():
+            event.accept()
+        else:
+            event.ignore()
+
+    def _inspector_changed(self) -> None:
+        node = self.inspector.node
+        if node is not None:
+            item = self.scene.node_items.get(node.id)
+            if item is not None:
+                item.refresh_title()
+        self._mark_dirty()
+
+    def _mark_dirty(self) -> None:
+        self.dirty = True
+        self._update_title()
+
+    def _update_title(self) -> None:
+        name = self.current_path.name if self.current_path else self.workflow.name
+        marker = " *" if self.dirty else ""
+        self.setWindowTitle(f"{name}{marker} — FlowPilot")
+
+    def _maybe_save(self) -> bool:
+        if not self.dirty:
+            return True
+        choice = QMessageBox.warning(
+            self,
+            "Unsaved changes",
+            "Save changes to the current workflow?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if choice == QMessageBox.StandardButton.Save:
+            return self.save_workflow()
+        return choice == QMessageBox.StandardButton.Discard
 
 
 def main() -> int:
