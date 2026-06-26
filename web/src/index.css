@@ -42,8 +42,16 @@ body {
 .fp-main {
   flex: 1;
   display: grid;
-  grid-template-columns: 232px 1fr 312px;
+  grid-template-columns: 268px 1fr 320px;
   min-height: 0;
+}
+
+.fp-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
 }
 
 /* ---------- Toolbar ---------- */
@@ -175,12 +183,14 @@ body {
 /* ---------- Palette ---------- */
 .fp-palette {
   background: var(--panel);
-  border-right: 1px solid var(--border);
-  padding: 16px 12px;
+  border-top: 1px solid var(--border);
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   overflow-y: auto;
+  flex-shrink: 0;
+  max-height: 52%;
 }
 
 .fp-palette-title {
@@ -525,4 +535,239 @@ body {
   font-weight: 600;
   pointer-events: none;
   box-shadow: 0 8px 20px -8px #6366f1;
+}
+
+/* ---------- Task list ---------- */
+.fp-tasklist {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.fp-tasklist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.fp-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.fp-icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fp-tasklist-scroll {
+  overflow-y: auto;
+  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fp-tasklist-empty {
+  padding: 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.fp-task {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.fp-task:hover {
+  background: var(--panel-2);
+}
+
+.fp-task.is-active {
+  background: #16203c;
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.fp-task-run {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: #4ade80;
+  cursor: pointer;
+}
+
+.fp-task-run:hover {
+  border-color: #4ade80;
+}
+
+.fp-task-run.is-running {
+  color: #fca5a5;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.fp-task-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.fp-task-name {
+  font-size: 13.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fp-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fp-kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 10.5px;
+  color: var(--text);
+}
+
+.fp-task-del {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  padding: 4px;
+}
+
+.fp-task:hover .fp-task-del {
+  opacity: 1;
+}
+
+.fp-task-del:hover {
+  color: #fca5a5;
+}
+
+/* ---------- Segment / checkbox / hotkey ---------- */
+.fp-segment {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+.fp-segment-item {
+  padding: 6px 4px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fp-segment-item.is-active {
+  background: var(--accent-grad);
+  color: white;
+}
+
+.fp-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.fp-check input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+}
+
+.fp-hotkey {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fp-hotkey .fp-input {
+  cursor: pointer;
+}
+
+/* ---------- Condition branch ports ---------- */
+.fp-handle-true {
+  background: #0b1020;
+  border-color: #22c55e;
+}
+
+.fp-handle-false {
+  background: #0b1020;
+  border-color: #ef4444;
+}
+
+.fp-port-label {
+  position: absolute;
+  right: 14px;
+  font-size: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* ---------- Toolbar run/stop ---------- */
+.fp-btn-stop {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #fca5a5;
+  font-weight: 600;
+}
+
+.fp-btn-stop:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.fp-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fp-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
 }

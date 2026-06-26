@@ -10,28 +10,26 @@ import {
   type NodeChange,
 } from '@xyflow/react'
 
+import { api } from './api'
 import {
   defaultConfig,
   defaultTitle,
   type NodeKind,
-  type Workflow,
+  type Task,
+  type TaskSummary,
+  type TriggerMode,
   type WorkflowNodeData,
 } from './types'
 
 export type FlowNode = Node<WorkflowNodeData>
 export type FlowEdge = Edge
 
-const EDGE_STYLE = {
-  type: 'smoothstep',
-  animated: true,
-  style: { stroke: '#64748b', strokeWidth: 2 },
-} as const
+const EDGE_STYLE = { type: 'smoothstep', animated: true } as const
 
 let counter = 0
 function newId(kind: NodeKind): string {
   counter += 1
-  const rand = Math.random().toString(36).slice(2, 8)
-  return `${kind}-${Date.now().toString(36)}-${counter}-${rand}`
+  return `${kind}-${Date.now().toString(36)}-${counter}-${Math.random().toString(36).slice(2, 7)}`
 }
 
 function makeNode(kind: NodeKind, position: { x: number; y: number }): FlowNode {
@@ -39,20 +37,48 @@ function makeNode(kind: NodeKind, position: { x: number; y: number }): FlowNode 
     id: newId(kind),
     type: 'flow',
     position,
+    deletable: kind !== 'start' && kind !== 'stop',
     data: { kind, title: defaultTitle(kind), config: defaultConfig(kind) },
   }
 }
 
+function edgeLabel(edge: FlowEdge): string {
+  return (edge.sourceHandle as string | null | undefined) || 'next'
+}
+
+interface Settings {
+  name: string
+  hotkey: string
+  stop_hotkey: string
+  trigger_mode: TriggerMode
+  repeat: number
+  enabled: boolean
+}
+
 interface StoreState {
+  tasks: TaskSummary[]
+  currentId: string | null
   nodes: FlowNode[]
   edges: FlowEdge[]
-  workflowName: string
-  dirty: boolean
+  settings: Settings
+  running: string[]
+  hotkeysAvailable: boolean
+  log: string[]
+  ready: boolean
+
+  init: () => Promise<void>
+  refreshTasks: () => Promise<void>
+  refreshStatus: () => Promise<void>
+  selectTask: (id: string) => Promise<void>
+  createTask: () => Promise<void>
+  deleteTask: (id: string) => Promise<void>
+  runTask: (id: string) => Promise<void>
+  stopTask: (id: string) => Promise<void>
+  stopAll: () => Promise<void>
 
   onNodesChange: (changes: NodeChange<FlowNode>[]) => void
   onEdgesChange: (changes: EdgeChange[]) => void
   onConnect: (connection: Connection) => void
-
   addNode: (kind: NodeKind, position: { x: number; y: number }) => void
   addImageNode: (name: string, dataUrl: string, position: { x: number; y: number }) => void
   setNodeImage: (id: string, name: string, dataUrl: string) => void
@@ -60,141 +86,222 @@ interface StoreState {
   updateConfig: (id: string, key: string, value: unknown) => void
   renameNode: (id: string, title: string) => void
   removeSelected: () => void
-  setWorkflowName: (name: string) => void
+  updateSettings: (patch: Partial<Settings>) => void
 
-  selectedNode: () => FlowNode | null
-  loadWorkflow: (wf: Workflow) => void
-  resetWorkflow: () => void
+  buildTask: () => Task | null
+  scheduleSave: () => void
 }
 
-function starterNodes(): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  const start: FlowNode = {
-    id: newId('start'),
-    type: 'flow',
-    position: { x: 80, y: 200 },
-    deletable: false,
-    data: { kind: 'start', title: 'Start', config: {} },
-  }
-  const delay = makeNode('delay', { x: 380, y: 200 })
-  const stop: FlowNode = {
-    id: newId('stop'),
-    type: 'flow',
-    position: { x: 680, y: 200 },
-    deletable: false,
-    data: { kind: 'stop', title: 'Stop', config: {} },
-  }
-  return {
-    nodes: [start, delay, stop],
-    edges: [
-      { id: `e-${start.id}-${delay.id}`, source: start.id, target: delay.id, ...EDGE_STYLE },
-      { id: `e-${delay.id}-${stop.id}`, source: delay.id, target: stop.id, ...EDGE_STYLE },
-    ],
-  }
+const DEFAULT_SETTINGS: Settings = {
+  name: '新任务',
+  hotkey: '',
+  stop_hotkey: '',
+  trigger_mode: 'once',
+  repeat: 1,
+  enabled: true,
 }
 
-const initial = starterNodes()
-
-function isStructuralChange(changes: NodeChange<FlowNode>[]): boolean {
-  return changes.some((c) => c.type === 'position' || c.type === 'add' || c.type === 'remove')
-}
+let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 export const useStore = create<StoreState>((set, get) => ({
-  nodes: initial.nodes,
-  edges: initial.edges,
-  workflowName: 'First workflow',
-  dirty: false,
+  tasks: [],
+  currentId: null,
+  nodes: [],
+  edges: [],
+  settings: { ...DEFAULT_SETTINGS },
+  running: [],
+  hotkeysAvailable: false,
+  log: [],
+  ready: false,
 
-  onNodesChange: (changes) =>
-    set((s) => ({
-      nodes: applyNodeChanges(changes, s.nodes),
-      dirty: s.dirty || isStructuralChange(changes),
-    })),
+  init: async () => {
+    await get().refreshTasks()
+    const { tasks } = get()
+    if (tasks.length === 0) {
+      await get().createTask()
+    } else {
+      await get().selectTask(tasks[0].id)
+    }
+    await get().refreshStatus()
+    set({ ready: true })
+  },
 
-  onEdgesChange: (changes) =>
-    set((s) => ({
-      edges: applyEdgeChanges(changes, s.edges),
-      dirty: s.dirty || changes.some((c) => c.type === 'remove' || c.type === 'add'),
-    })),
+  refreshTasks: async () => {
+    try {
+      set({ tasks: await api.listTasks() })
+    } catch {
+      /* engine offline */
+    }
+  },
 
-  onConnect: (connection) => {
-    const { source, target } = connection
-    if (!source || !target || source === target) return
-    set((s) => {
-      // One outgoing connection per node: drop any existing edge from this source.
-      const pruned = s.edges.filter((e) => e.source !== source)
-      const edge: FlowEdge = {
-        id: `e-${source}-${target}`,
-        source,
-        target,
-        ...EDGE_STYLE,
-      }
-      return { edges: addEdge(edge, pruned), dirty: true }
+  refreshStatus: async () => {
+    try {
+      const s = await api.status()
+      set({ running: s.running, hotkeysAvailable: s.hotkeys, log: s.log })
+    } catch {
+      /* engine offline */
+    }
+  },
+
+  selectTask: async (id) => {
+    const task = await api.getTask(id)
+    const nodes: FlowNode[] = task.nodes.map((n) => ({
+      id: n.id,
+      type: 'flow',
+      position: { x: n.x, y: n.y },
+      deletable: n.kind !== 'start' && n.kind !== 'stop',
+      data: { kind: n.kind, title: n.title, config: { ...n.config } },
+    }))
+    const edges: FlowEdge[] = task.edges.map((e) => ({
+      id: `e-${e.source}-${e.target}-${e.label ?? 'next'}`,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.label && e.label !== 'next' ? e.label : null,
+      label: e.label === 'true' ? '是' : e.label === 'false' ? '否' : undefined,
+      ...EDGE_STYLE,
+    }))
+    set({
+      currentId: id,
+      nodes,
+      edges,
+      settings: {
+        name: task.name,
+        hotkey: task.hotkey,
+        stop_hotkey: task.stop_hotkey,
+        trigger_mode: task.trigger_mode,
+        repeat: task.repeat,
+        enabled: task.enabled,
+      },
     })
   },
 
-  addNode: (kind, position) =>
-    set((s) => ({ nodes: [...s.nodes, makeNode(kind, position)], dirty: true })),
+  createTask: async () => {
+    const task = await api.createTask('新任务')
+    await get().refreshTasks()
+    await get().selectTask(task.id)
+  },
 
-  addImageNode: (name, dataUrl, position) =>
+  deleteTask: async (id) => {
+    await api.deleteTask(id)
+    await get().refreshTasks()
+    const { tasks, currentId } = get()
+    if (currentId === id) {
+      if (tasks.length > 0) await get().selectTask(tasks[0].id)
+      else await get().createTask()
+    }
+  },
+
+  runTask: async (id) => {
+    try {
+      await api.runTask(id)
+    } finally {
+      await get().refreshStatus()
+    }
+  },
+
+  stopTask: async (id) => {
+    await api.stopTask(id)
+    await get().refreshStatus()
+  },
+
+  stopAll: async () => {
+    await api.stopAll()
+    await get().refreshStatus()
+  },
+
+  onNodesChange: (changes) => {
+    set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) }))
+    if (changes.some((c) => c.type === 'position' || c.type === 'remove' || c.type === 'add')) {
+      get().scheduleSave()
+    }
+  },
+
+  onEdgesChange: (changes) => {
+    set((s) => ({ edges: applyEdgeChanges(changes, s.edges) }))
+    if (changes.some((c) => c.type === 'remove' || c.type === 'add')) get().scheduleSave()
+  },
+
+  onConnect: (connection) => {
+    const { source, target, sourceHandle } = connection
+    if (!source || !target || source === target) return
+    const label = sourceHandle || 'next'
     set((s) => {
-      const node: FlowNode = {
-        id: newId('find_image'),
-        type: 'flow',
-        position,
-        data: {
-          kind: 'find_image',
-          title: name ? `找图：${name}` : 'Find image',
-          config: { template: name, templateData: dataUrl, threshold: 0.85 },
-        },
+      // one outgoing edge per (source, handle)
+      const pruned = s.edges.filter((e) => !(e.source === source && edgeLabel(e) === label))
+      const edge: FlowEdge = {
+        id: `e-${source}-${target}-${label}`,
+        source,
+        target,
+        sourceHandle: sourceHandle ?? null,
+        label: label === 'true' ? '是' : label === 'false' ? '否' : undefined,
+        ...EDGE_STYLE,
       }
-      return { nodes: [...s.nodes, node], dirty: true }
-    }),
+      return { edges: addEdge(edge, pruned) }
+    })
+    get().scheduleSave()
+  },
 
-  setNodeImage: (id, name, dataUrl) =>
+  addNode: (kind, position) => {
+    set((s) => ({ nodes: [...s.nodes, makeNode(kind, position)] }))
+    get().scheduleSave()
+  },
+
+  addImageNode: (name, dataUrl, position) => {
+    const node: FlowNode = {
+      id: newId('find_click'),
+      type: 'flow',
+      position,
+      deletable: true,
+      data: {
+        kind: 'find_click',
+        title: name ? `点击：${name}` : '找图点击',
+        config: { ...defaultConfig('find_click'), template: name, templateData: dataUrl },
+      },
+    }
+    set((s) => ({ nodes: [...s.nodes, node] }))
+    get().scheduleSave()
+  },
+
+  setNodeImage: (id, name, dataUrl) => {
     set((s) => ({
       nodes: s.nodes.map((n) =>
         n.id === id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                config: { ...n.data.config, template: name, templateData: dataUrl },
-              },
-            }
+          ? { ...n, data: { ...n.data, config: { ...n.data.config, template: name, templateData: dataUrl } } }
           : n,
       ),
-      dirty: true,
-    })),
+    }))
+    get().scheduleSave()
+  },
 
-  clearNodeImage: (id) =>
+  clearNodeImage: (id) => {
     set((s) => ({
       nodes: s.nodes.map((n) =>
         n.id === id
           ? { ...n, data: { ...n.data, config: { ...n.data.config, template: '', templateData: '' } } }
           : n,
       ),
-      dirty: true,
-    })),
+    }))
+    get().scheduleSave()
+  },
 
-  updateConfig: (id, key, value) =>
+  updateConfig: (id, key, value) => {
     set((s) => ({
       nodes: s.nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, config: { ...n.data.config, [key]: value } } } : n,
       ),
-      dirty: true,
-    })),
+    }))
+    get().scheduleSave()
+  },
 
-  renameNode: (id, title) =>
+  renameNode: (id, title) => {
     set((s) => ({
-      nodes: s.nodes.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, title } } : n,
-      ),
-      dirty: true,
-    })),
+      nodes: s.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, title } } : n)),
+    }))
+    get().scheduleSave()
+  },
 
-  removeSelected: () =>
+  removeSelected: () => {
     set((s) => {
-      // Start and Stop are required for a valid workflow, so they are never deletable.
       const toRemove = new Set(
         s.nodes
           .filter((n) => n.selected && n.data.kind !== 'start' && n.data.kind !== 'stop')
@@ -207,35 +314,48 @@ export const useStore = create<StoreState>((set, get) => ({
         edges: s.edges.filter(
           (e) => !selectedEdges.has(e.id) && !toRemove.has(e.source) && !toRemove.has(e.target),
         ),
-        dirty: true,
       }
-    }),
+    })
+    get().scheduleSave()
+  },
 
-  setWorkflowName: (name) => set({ workflowName: name, dirty: true }),
+  updateSettings: (patch) => {
+    set((s) => ({ settings: { ...s.settings, ...patch } }))
+    get().scheduleSave()
+  },
 
-  selectedNode: () => get().nodes.find((n) => n.selected) ?? null,
-
-  loadWorkflow: (wf) =>
-    set(() => {
-      const nodes: FlowNode[] = wf.nodes.map((n) => ({
+  buildTask: () => {
+    const { currentId, nodes, edges, settings } = get()
+    if (!currentId) return null
+    return {
+      id: currentId,
+      name: settings.name,
+      hotkey: settings.hotkey,
+      stop_hotkey: settings.stop_hotkey,
+      trigger_mode: settings.trigger_mode,
+      repeat: settings.repeat,
+      enabled: settings.enabled,
+      nodes: nodes.map((n) => ({
         id: n.id,
-        type: 'flow',
-        position: { x: n.x, y: n.y },
-        deletable: n.kind !== 'start' && n.kind !== 'stop',
-        data: { kind: n.kind, title: n.title, config: { ...n.config } },
-      }))
-      const edges: FlowEdge[] = wf.edges.map((e) => ({
-        id: `e-${e.source}-${e.target}`,
-        source: e.source,
-        target: e.target,
-        ...EDGE_STYLE,
-      }))
-      return { nodes, edges, workflowName: wf.name || 'Untitled workflow', dirty: false }
-    }),
+        kind: n.data.kind,
+        title: n.data.title,
+        x: Math.round(n.position.x),
+        y: Math.round(n.position.y),
+        config: { ...n.data.config },
+      })),
+      edges: edges.map((e) => ({ source: e.source, target: e.target, label: edgeLabel(e) })),
+    }
+  },
 
-  resetWorkflow: () =>
-    set(() => {
-      const fresh = starterNodes()
-      return { ...fresh, workflowName: 'Untitled workflow', dirty: false }
-    }),
+  scheduleSave: () => {
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      const task = get().buildTask()
+      if (!task) return
+      api
+        .saveTask(task)
+        .then(() => get().refreshTasks())
+        .catch(() => {})
+    }, 500)
+  },
 }))

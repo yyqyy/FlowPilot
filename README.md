@@ -1,56 +1,46 @@
 # FlowPilot
 
-FlowPilot is an open-source visual automation studio. Build reusable workflows by dragging nodes,
-connecting them, and configuring actions such as screenshot matching, mouse clicks, text input, and
-random delays.
+FlowPilot is an open-source, **local** visual automation tool — like a Logitech-style macro manager,
+but with a blueprint-style node editor. You wire up tasks in the browser UI; a local Python engine
+runs them against the real desktop and listens for **global hotkeys** to start/stop them.
 
-> Status: early MVP. The **web editor** (`web/`) is the recommended way to build workflows — it
-> exports a self-contained Python script that runs the automation locally, fast and precise. A
-> Python desktop editor (`src/flowpilot/`) also exists and shares the same runtime concepts.
+> Status: early MVP. The product is a **local engine + web UI**: build node-graph tasks, bind
+> hotkeys, and run them. Image targets are matched on screen (no fixed coordinates), so the same
+> task works on any machine.
 
-## Web editor (FlowPilot Studio)
+## How it works
 
-The browser is the editor; the exported script is the runtime. You design a workflow visually and
-**export a standalone `*.py`** that uses OpenCV for template matching and direct input control —
-no GUI framework needed to run it.
+- **Web UI** (`web/`) — a node editor: find-and-click images, find-and-type, key presses, delays,
+  launch apps, and a condition node that branches on what's on screen.
+- **Local engine** (`src/flowpilot/engine/`) — runs tasks with OpenCV template matching + direct
+  input control, persists them locally, and registers global start/stop hotkeys.
+- The browser only edits and controls; the engine does the automation. Nothing is "exported" — your
+  tasks live in the engine and run there.
+
+## Run it
 
 ```powershell
-cd web
-npm install
-npm run dev      # http://localhost:5173
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+flowpilot-studio          # serves the UI + engine at http://127.0.0.1:8765
 ```
 
-See [web/README.md](web/README.md) for the export format and node-to-script mapping.
+Build a task, optionally bind a start hotkey, and press it anywhere. Each task runs **once /
+multiple times / loop**; pressing the start hotkey again restarts it; the stop hotkey (or moving the
+mouse into a screen corner) aborts it. See [web/README.md](web/README.md) for the node reference.
 
 ## Why FlowPilot?
 
-Many automation tools are either code-only or tied to fixed coordinates. FlowPilot aims to make
-screen-aware automation understandable and editable by non-programmers while keeping workflows
-portable and reviewable as JSON files.
-
-## Current build
-
-- Drag nodes around an infinite canvas.
-- Capture a screen region and create a template node from it.
-- Match a template on the desktop with OpenCV and report its coordinates and confidence.
-- Run a sequential workflow in dry-run mode.
-- Execute fixed-position clicks, matched-image clicks, and text input when dry-run is disabled.
-- Add fixed or randomized delays.
-
-The capture overlay currently uses the primary display. Multi-monitor capture is tracked for a
-later milestone.
-
-## Try it
-
-Start FlowPilot, select **Capture template**, and drag around a small target on the screen. The
-captured image is stored under `assets/templates` and a configured image node is added to the
-canvas. Use **Test image** to check whether a saved template can be found on the current desktop.
+Many automation tools are either code-only or tied to fixed pixel coordinates that break on a
+different screen. FlowPilot makes screen-aware automation visual and editable, and targets images
+instead of coordinates so tasks are portable across machines.
 
 ## Safety and responsible use
 
 Use FlowPilot only on software, accounts, and devices you own or are authorized to automate.
 Do not use it to bypass anti-cheat systems, CAPTCHAs, access controls, rate limits, or a service's
-rules. An emergency stop and dry-run mode are core product requirements.
+rules. A stop hotkey and the PyAutoGUI fail-safe (slam the mouse to a corner) are core requirements.
 
 ## Development
 
@@ -58,7 +48,7 @@ rules. An emergency stop and dry-run mode are core product requirements.
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
-flowpilot
+flowpilot-studio
 ```
 
 Run tests with `pytest`.
