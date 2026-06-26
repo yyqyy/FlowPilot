@@ -58,11 +58,24 @@ class ScreenMatcher:
         region: ScreenRegion | None = None,
         screen: np.ndarray | None = None,
     ) -> MatchResult | None:
-        if not 0 <= threshold <= 1:
-            raise ValueError("Threshold must be between 0 and 1.")
         template = cv2.imread(str(template_path), cv2.IMREAD_COLOR)
         if template is None:
             raise FileNotFoundError(f"Template image could not be read: {template_path}")
+        return self.locate(template, threshold=threshold, region=region, screen=screen)
+
+    def locate(
+        self,
+        template: np.ndarray,
+        *,
+        threshold: float = 0.85,
+        region: ScreenRegion | None = None,
+        screen: np.ndarray | None = None,
+    ) -> MatchResult | None:
+        """Match an in-memory BGR template against the screen (or a given image)."""
+        if not 0 <= threshold <= 1:
+            raise ValueError("Threshold must be between 0 and 1.")
+        if template is None or template.size == 0:
+            raise ValueError("Template image is empty.")
 
         haystack = screen if screen is not None else self.capture(region)
         if haystack.ndim != 3 or haystack.shape[2] != 3:
