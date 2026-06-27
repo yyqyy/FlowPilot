@@ -14,23 +14,29 @@ import { api } from './api'
 import {
   defaultConfig,
   defaultTitle,
-  portLabel,
+  defaultVarValue,
+  effectivePinType,
+  PIN_COLORS,
+  pinsCompatible,
   type NodeKind,
+  type PinKind,
   type Task,
   type TaskSummary,
   type TriggerMode,
+  type Variable,
+  type VariableType,
   type WorkflowNodeData,
 } from './types'
 
 export type FlowNode = Node<WorkflowNodeData>
-export type FlowEdge = Edge
+export type FlowEdge = Edge<{ kind: 'exec' | 'data' }>
 
-const EDGE_STYLE = { type: 'smoothstep', animated: true } as const
+const EXEC_COLOR = '#94a3b8'
 
 let counter = 0
-function newId(kind: NodeKind): string {
+function newId(prefix: string): string {
   counter += 1
-  return `${kind}-${Date.now().toString(36)}-${counter}-${Math.random().toString(36).slice(2, 7)}`
+  return `${prefix}-${Date.now().toString(36)}-${counter}-${Math.random().toString(36).slice(2, 7)}`
 }
 
 function makeNode(kind: NodeKind, position: { x: number; y: number }): FlowNode {
@@ -43,8 +49,68 @@ function makeNode(kind: NodeKind, position: { x: number; y: number }): FlowNode 
   }
 }
 
-function edgeLabel(edge: FlowEdge): string {
-  return (edge.sourceHandle as string | null | undefined) || 'next'
+function makeVarNode(name: string, mode: 'get' | 'set', position: { x: number; y: number }): FlowNode {
+  const kind: NodeKind = mode === 'get' ? 'var_get' : 'var_set'
+  return {
+    id: newId(kind),
+    type: 'flow',
+    position,
+    deletable: true,
+    data: {
+      kind,
+      title: `${mode === 'get' ? '获取' : '设置'} ${name}`,
+      config: { ...defaultConfig(kind), name },
+    },
+  }
+}
+
+function edgeId(source: string, sh: string | null, target: string, th: string | null): string {
+  return `e-${source}.${sh ?? ''}-${target}.${th ?? ''}`
+}
+
+function makeEdge(
+  source: string,
+  sourceHandle: string | null,
+  target: string,
+  targetHandle: string | null,
+  kind: 'exec' | 'data',
+  color: string,
+): FlowEdge {
+  return {
+    id: edgeId(source, sourceHandle, target, targetHandle),
+    source,
+    target,
+    sourceHandle: sourceHandle ?? null,
+    targetHandle: targetHandle ?? null,
+    type: 'smoothstep',
+    animated: kind === 'exec',
+    data: { kind },
+    style: { stroke: color, strokeWidth: 2, strokeDasharray: kind === 'data' ? '6 4' : undefined },
+  }
+}
+
+function configName(node: FlowNode | undefined): string | undefined {
+  return node ? String(node.data.config.name ?? '') : undefined
+}
+
+/** Validate a drag-created connection. Returns the wire kind + colour, or null
+ *  when the pins are incompatible (exec↔exec, data↔matching-data only). */
+function validateConnection(
+  connection: Connection | Edge,
+  nodes: FlowNode[],
+  variables: Variable[],
+): { kind: 'exec' | 'data'; color: string } | null {
+  const { source, target, sourceHandle, targetHandle } = connection
+  if (!source || !target || source === target) return null
+  const sNode = nodes.find((n) => n.id === source)
+  const tNode = nodes.find((n) => n.id === target)
+  if (!sNode || !tNode) return null
+  const sType = effectivePinType(sNode.data.kind, sourceHandle, configName(sNode), variables)
+  const tType = effectivePinType(tNode.data.kind, targetHandle, configName(tNode), variables)
+  if (!pinsCompatible(sType, tType)) return null
+  const kind: 'exec' | 'data' = sType === 'exec' ? 'exec' : 'data'
+  const concrete: PinKind = sType && sType !== 'var' ? sType : tType && tType !== 'var' ? tType : 'var'
+  return { kind, color: kind === 'exec' ? EXEC_COLOR : PIN_COLORS[concrete] }
 }
 
 interface Settings {
@@ -61,6 +127,7 @@ interface StoreState {
   currentId: string | null
   nodes: FlowNode[]
   edges: FlowEdge[]
+  variables: Variable[]
   settings: Settings
   running: string[]
   hotkeysAvailable: boolean
@@ -78,19 +145,27 @@ interface StoreState {
   stopAll: () => Promise<void>
 
   onNodesChange: (changes: NodeChange<FlowNode>[]) => void
-  onEdgesChange: (changes: EdgeChange[]) => void
+  onEdgesChange: (changes: EdgeChange<FlowEdge>[]) => void
   onConnect: (connection: Connection) => void
+  isValidConnection: (connection: Connection | Edge) => boolean
   addNode: (kind: NodeKind, position: { x: number; y: number }) => void
   addImageNode: (name: string, dataUrl: string, position: { x: number; y: number }) => void
+  addVarNode: (name: string, mode: 'get' | 'set', position: { x: number; y: number }) => void
   setNodeImage: (id: string, name: string, dataUrl: string) => void
   clearNodeImage: (id: string) => void
   updateConfig: (id: string, key: string, value: unknown) => void
+  updateConfigMany: (id: string, patch: Record<string, unknown>) => void
   renameNode: (id: string, title: string) => void
   removeSelected: () => void
   copySelection: () => void
   paste: () => void
   duplicateSelected: () => void
   updateSettings: (patch: Partial<Settings>) => void
+
+  addVariable: () => void
+  renameVariable: (id: string, name: string) => void
+  retypeVariable: (id: string, type: VariableType) => void
+  removeVariable: (id: string) => void
 
   buildTask: () => Task | null
   scheduleSave: () => void
@@ -115,6 +190,7 @@ export const useStore = create<StoreState>((set, get) => ({
   currentId: null,
   nodes: [],
   edges: [],
+  variables: [],
   settings: { ...DEFAULT_SETTINGS },
   running: [],
   hotkeysAvailable: false,
@@ -152,6 +228,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   selectTask: async (id) => {
     const task = await api.getTask(id)
+    const variables = task.variables ?? []
     const nodes: FlowNode[] = task.nodes.map((n) => ({
       id: n.id,
       type: 'flow',
@@ -159,18 +236,29 @@ export const useStore = create<StoreState>((set, get) => ({
       deletable: n.kind !== 'start' && n.kind !== 'stop',
       data: { kind: n.kind, title: n.title, config: { ...n.config } },
     }))
-    const edges: FlowEdge[] = task.edges.map((e) => ({
-      id: `e-${e.source}-${e.target}-${e.label ?? 'next'}`,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.label && e.label !== 'next' ? e.label : null,
-      label: portLabel(e.label),
-      ...EDGE_STYLE,
-    }))
+    const kindById = new Map(task.nodes.map((n) => [n.id, n] as const))
+    const edges: FlowEdge[] = task.edges.map((e) => {
+      const kind = e.kind === 'data' ? 'data' : 'exec'
+      const src = kindById.get(e.source)
+      const sType = src
+        ? effectivePinType(src.kind, e.source_handle, String(src.config.name ?? ''), variables)
+        : null
+      const concrete: PinKind = sType && sType !== 'var' ? sType : 'var'
+      const color = kind === 'exec' ? EXEC_COLOR : PIN_COLORS[concrete]
+      return makeEdge(
+        e.source,
+        e.source_handle ?? null,
+        e.target,
+        e.target_handle ?? null,
+        kind,
+        color,
+      )
+    })
     set({
       currentId: id,
       nodes,
       edges,
+      variables,
       settings: {
         name: task.name,
         hotkey: task.hotkey,
@@ -228,21 +316,26 @@ export const useStore = create<StoreState>((set, get) => ({
     if (changes.some((c) => c.type === 'remove' || c.type === 'add')) get().scheduleSave()
   },
 
+  isValidConnection: (connection) => {
+    const { nodes, variables } = get()
+    return validateConnection(connection, nodes, variables) !== null
+  },
+
   onConnect: (connection) => {
-    const { source, target, sourceHandle } = connection
-    if (!source || !target || source === target) return
-    const label = sourceHandle || 'next'
+    const { source, target, sourceHandle, targetHandle } = connection
+    const { nodes, variables } = get()
+    const verdict = validateConnection(connection, nodes, variables)
+    if (!verdict || !source || !target) return
     set((s) => {
-      // one outgoing edge per (source, handle)
-      const pruned = s.edges.filter((e) => !(e.source === source && edgeLabel(e) === label))
-      const edge: FlowEdge = {
-        id: `e-${source}-${target}-${label}`,
-        source,
-        target,
-        sourceHandle: sourceHandle ?? null,
-        label: portLabel(label),
-        ...EDGE_STYLE,
-      }
+      const pruned = s.edges.filter((e) => {
+        const intoSameTarget = e.target === target && (e.targetHandle ?? null) === (targetHandle ?? null)
+        const outSameExec =
+          verdict.kind === 'exec' &&
+          e.source === source &&
+          (e.sourceHandle ?? null) === (sourceHandle ?? null)
+        return !intoSameTarget && !outSameExec
+      })
+      const edge = makeEdge(source, sourceHandle ?? null, target, targetHandle ?? null, verdict.kind, verdict.color)
       return { edges: addEdge(edge, pruned) }
     })
     get().scheduleSave()
@@ -266,6 +359,11 @@ export const useStore = create<StoreState>((set, get) => ({
       },
     }
     set((s) => ({ nodes: [...s.nodes, node] }))
+    get().scheduleSave()
+  },
+
+  addVarNode: (name, mode, position) => {
+    set((s) => ({ nodes: [...s.nodes, makeVarNode(name, mode, position)] }))
     get().scheduleSave()
   },
 
@@ -295,6 +393,15 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       nodes: s.nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, config: { ...n.data.config, [key]: value } } } : n,
+      ),
+    }))
+    get().scheduleSave()
+  },
+
+  updateConfigMany: (id, patch) => {
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        n.id === id ? { ...n, data: { ...n.data, config: { ...n.data.config, ...patch } } } : n,
       ),
     }))
     get().scheduleSave()
@@ -357,7 +464,13 @@ export const useStore = create<StoreState>((set, get) => ({
     const newEdges: FlowEdge[] = clipboard.edges.map((e) => {
       const source = idMap.get(e.source) as string
       const target = idMap.get(e.target) as string
-      return { ...e, id: `e-${source}-${target}-${edgeLabel(e)}`, source, target, selected: false }
+      return {
+        ...e,
+        id: edgeId(source, e.sourceHandle ?? null, target, e.targetHandle ?? null),
+        source,
+        target,
+        selected: false,
+      }
     })
     set((s) => ({
       nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), ...newNodes],
@@ -376,8 +489,67 @@ export const useStore = create<StoreState>((set, get) => ({
     get().scheduleSave()
   },
 
+  addVariable: () => {
+    set((s) => {
+      const used = new Set(s.variables.map((v) => v.name))
+      let i = s.variables.length + 1
+      let name = `变量${i}`
+      while (used.has(name)) name = `变量${++i}`
+      const variable: Variable = { id: newId('var'), name, type: 'bool', default: false }
+      return { variables: [...s.variables, variable] }
+    })
+    get().scheduleSave()
+  },
+
+  renameVariable: (id, name) => {
+    set((s) => {
+      const old = s.variables.find((v) => v.id === id)
+      if (!old) return {}
+      const nodes = s.nodes.map((n) =>
+        (n.data.kind === 'var_get' || n.data.kind === 'var_set') && n.data.config.name === old.name
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                title: `${n.data.kind === 'var_get' ? '获取' : '设置'} ${name}`,
+                config: { ...n.data.config, name },
+              },
+            }
+          : n,
+      )
+      return {
+        variables: s.variables.map((v) => (v.id === id ? { ...v, name } : v)),
+        nodes,
+      }
+    })
+    get().scheduleSave()
+  },
+
+  retypeVariable: (id, type) => {
+    set((s) => {
+      const target = s.variables.find((v) => v.id === id)
+      if (!target) return {}
+      const fresh = defaultVarValue(type)
+      const nodes = s.nodes.map((n) =>
+        n.data.kind === 'var_set' && n.data.config.name === target.name
+          ? { ...n, data: { ...n.data, config: { ...n.data.config, value: fresh } } }
+          : n,
+      )
+      return {
+        variables: s.variables.map((v) => (v.id === id ? { ...v, type, default: fresh } : v)),
+        nodes,
+      }
+    })
+    get().scheduleSave()
+  },
+
+  removeVariable: (id) => {
+    set((s) => ({ variables: s.variables.filter((v) => v.id !== id) }))
+    get().scheduleSave()
+  },
+
   buildTask: () => {
-    const { currentId, nodes, edges, settings } = get()
+    const { currentId, nodes, edges, variables, settings } = get()
     if (!currentId) return null
     return {
       id: currentId,
@@ -387,6 +559,7 @@ export const useStore = create<StoreState>((set, get) => ({
       trigger_mode: settings.trigger_mode,
       repeat: settings.repeat,
       enabled: settings.enabled,
+      variables,
       nodes: nodes.map((n) => ({
         id: n.id,
         kind: n.data.kind,
@@ -395,7 +568,13 @@ export const useStore = create<StoreState>((set, get) => ({
         y: Math.round(n.position.y),
         config: { ...n.data.config },
       })),
-      edges: edges.map((e) => ({ source: e.source, target: e.target, label: edgeLabel(e) })),
+      edges: edges.map((e) => ({
+        source: e.source,
+        source_handle: (e.sourceHandle as string | null) ?? 'then',
+        target: e.target,
+        target_handle: (e.targetHandle as string | null) ?? 'exec',
+        kind: e.data?.kind ?? 'exec',
+      })),
     }
   },
 

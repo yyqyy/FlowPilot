@@ -11,18 +11,22 @@ import {
 } from '@xyflow/react'
 
 import { useStore } from '../store'
-import { NODE_META, type NodeKind, type WorkflowNodeData } from '../types'
+import { NODE_SPECS, type NodeKind, type WorkflowNodeData } from '../types'
 import { WorkflowNode } from './WorkflowNode'
 
 const nodeTypes: NodeTypes = { flow: WorkflowNode }
 
 function miniMapColor(kind: NodeKind | undefined): string {
-  return kind ? NODE_META[kind].accent : '#64748b'
+  return kind ? NODE_SPECS[kind].accent : '#64748b'
 }
 
 function canAcceptDrag(event: React.DragEvent): boolean {
   const types = event.dataTransfer.types
-  return types.includes('Files') || types.includes('application/flowpilot-node')
+  return (
+    types.includes('Files') ||
+    types.includes('application/flowpilot-node') ||
+    types.includes('application/flowpilot-var')
+  )
 }
 
 export function FlowCanvas() {
@@ -33,6 +37,8 @@ export function FlowCanvas() {
   const onConnect = useStore((s) => s.onConnect)
   const addImageNode = useStore((s) => s.addImageNode)
   const addNode = useStore((s) => s.addNode)
+  const addVarNode = useStore((s) => s.addVarNode)
+  const isValidConnection = useStore((s) => s.isValidConnection)
   const copySelection = useStore((s) => s.copySelection)
   const paste = useStore((s) => s.paste)
   const duplicateSelected = useStore((s) => s.duplicateSelected)
@@ -108,6 +114,17 @@ export function FlowCanvas() {
         return
       }
 
+      const varPayload = event.dataTransfer.getData('application/flowpilot-var')
+      if (varPayload) {
+        try {
+          const { name, mode } = JSON.parse(varPayload) as { name: string; mode: 'get' | 'set' }
+          addVarNode(name, mode, origin)
+        } catch {
+          /* malformed drag payload */
+        }
+        return
+      }
+
       const images = Array.from(event.dataTransfer.files).filter((f) => f.type.startsWith('image/'))
       images.forEach((file, index) => {
         const reader = new FileReader()
@@ -119,7 +136,7 @@ export function FlowCanvas() {
         reader.readAsDataURL(file)
       })
     },
-    [screenToFlowPosition, addImageNode, addNode],
+    [screenToFlowPosition, addImageNode, addNode, addVarNode],
   )
 
   return (
@@ -138,6 +155,7 @@ export function FlowCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={isValidConnection}
         fitView
         minZoom={0.25}
         maxZoom={2.5}

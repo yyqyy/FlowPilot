@@ -276,16 +276,22 @@ body {
   display: flex;
   align-items: stretch;
   width: 208px;
+  min-height: 78px;
   border-radius: 13px;
   background: linear-gradient(180deg, #172139 0%, #131c30 100%);
   border: 1px solid var(--border);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 14px 30px -18px rgba(0, 0, 0, 0.8);
+}
+
+.fp-node-pure {
+  min-height: 52px;
 }
 
 .fp-node-accent {
   width: 5px;
   flex-shrink: 0;
+  border-radius: 13px 0 0 13px;
 }
 
 .fp-node-body {
@@ -317,15 +323,46 @@ body {
   text-overflow: ellipsis;
 }
 
-.fp-handle {
-  width: 11px;
-  height: 11px;
-  background: #0b1020;
-  border: 2px solid var(--accent);
+/* Pins: exec = white square (control flow), data = coloured circle (values) */
+.react-flow__handle.fp-pin {
+  width: 12px;
+  height: 12px;
 }
 
-.fp-handle:hover {
-  background: var(--accent);
+.react-flow__handle.fp-pin-data {
+  border-radius: 50%;
+  border: 2px solid #94a3b8;
+}
+
+.react-flow__handle.fp-pin-exec {
+  border-radius: 3px;
+  background: #0b1020 !important;
+  border: 2px solid #e2e8f0;
+}
+
+.react-flow__handle.fp-pin:hover {
+  filter: brightness(1.4);
+}
+
+.fp-pin-label {
+  position: absolute;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--muted);
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fp-pin-label-in {
+  left: 13px;
+}
+
+.fp-pin-label-out {
+  right: 13px;
+  text-align: right;
 }
 
 .react-flow__controls button {
@@ -851,4 +888,265 @@ body {
   height: 7px;
   border-radius: 999px;
   background: currentColor;
+}
+
+/* ---------- Variables panel (My-Blueprint style) ---------- */
+.fp-vars {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  max-height: 40%;
+  overflow-y: auto;
+}
+
+.fp-vars-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.fp-var-empty {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.fp-var-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.fp-var-top {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.fp-var-name {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+
+.fp-var-name:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.fp-var-type {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  padding: 5px 6px;
+  font-size: 12px;
+}
+
+.fp-var-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.fp-var-chip {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 11.5px;
+  cursor: grab;
+  text-align: center;
+}
+
+.fp-var-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fp-var-chip:active {
+  cursor: grabbing;
+}
+
+.fp-var-del {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.fp-var-del:hover {
+  color: #fca5a5;
+}
+
+.fp-var-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ---------- Swipe editor ---------- */
+.fp-swipe {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fp-swipe-stage {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #0b1020;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.fp-swipe-stage img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.fp-swipe-point {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.8);
+  cursor: grab;
+  z-index: 2;
+}
+
+.fp-swipe-point:active {
+  cursor: grabbing;
+}
+
+.fp-swipe-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fp-swipe-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fp-swipe-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.fp-swipe-segs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fp-swipe-seg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fp-swipe-seg span {
+  min-width: 56px;
+}
+
+.fp-swipe-seg input {
+  flex: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+
+.fp-swipe-drop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  background: rgba(20, 184, 166, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.fp-swipe-drop:hover {
+  border-color: #14b8a6;
+  color: var(--text);
+}
+
+/* Zoomed/enlarged swipe preview overlay */
+.fp-swipe-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(2, 6, 23, 0.82);
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.fp-swipe-overlay-inner {
+  max-width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fp-swipe-overlay .fp-swipe-stage {
+  max-height: 80vh;
+}
+
+.fp-swipe-overlay .fp-swipe-stage img {
+  max-height: 80vh;
+  width: auto;
 }

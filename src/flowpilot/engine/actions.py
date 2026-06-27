@@ -38,6 +38,12 @@ class InputController(Protocol):
 
     def launch(self, path: str, args: str = "", wait: float = 0.0) -> None: ...
 
+    def screen_size(self) -> tuple[int, int]: ...
+
+    def drag_path(
+        self, points: list[tuple[int, int]], durations: list[float], *, button: str = "left"
+    ) -> None: ...
+
 
 class PyAutoGuiController:
     """Real input via PyAutoGUI; app launching via the OS."""
@@ -96,3 +102,24 @@ class PyAutoGuiController:
             subprocess.Popen(argv, shell=False)
         else:
             subprocess.Popen(argv)
+
+    def screen_size(self) -> tuple[int, int]:
+        size = self._gui.size()
+        return int(size[0]), int(size[1])
+
+    def drag_path(
+        self, points: list[tuple[int, int]], durations: list[float], *, button: str = "left"
+    ) -> None:
+        """Press at the first point, drag through the rest, release at the last.
+        `durations[i]` is the seconds spent dragging into point i+1."""
+        if len(points) < 2:
+            return
+        gui_button = "right" if button == "right" else "left"
+        self._gui.moveTo(points[0][0], points[0][1])
+        self._gui.mouseDown(button=gui_button)
+        try:
+            for index in range(1, len(points)):
+                seconds = durations[index - 1] if index - 1 < len(durations) else 0.3
+                self._gui.moveTo(points[index][0], points[index][1], duration=max(0.0, seconds))
+        finally:
+            self._gui.mouseUp(button=gui_button)

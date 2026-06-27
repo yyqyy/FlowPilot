@@ -8,6 +8,47 @@ project adheres to [Semantic Versioning](https://semver.org/).
 版本号遵循[语义化版本](https://semver.org/)。每次发布请在下方新增一节，并按
 **Added 新增 / Changed 变更 / Fixed 修复 / Removed 移除** 分类记录。
 
+## [0.2.0] - 2026-06-27
+
+A node-graph overhaul: execution wires, typed data wires, typed variables, and a swipe gesture node.
+节点图大改：执行线、带类型的数据线、带类型的变量，以及全新的滑动手势节点。
+
+### Added 新增
+
+- Execution wires and data wires: every node now has typed input/output ports — white square ports
+  for execution order, coloured round ports for values — and connections are validated by type.
+  执行线与数据线：每个节点都有带类型的输入/输出端口 —— 白色方口控制执行顺序、彩色圆口传递值 ——
+  连线按类型校验。
+- `find_click` / `find_type` / `condition` now branch on their own result: **成功 / 失败**
+  (or 真/假) execution outputs plus a **找到** boolean data output.
+  找图点击 / 找图输入 / 看图判断 现在能按自身结果分流：**成功 / 失败**（或真/假）执行出口，
+  外加一个 **找到** 布尔数据出口。
+- Typed variables (**布尔 / 文本 / 坐标点**) with a side panel to create, rename, and retype them,
+  plus **获取 / 设置** (`var_get` / `var_set`) nodes wired by data lines.
+  带类型的变量（**布尔 / 文本 / 坐标点**），侧边面板可新建、改名、改类型，并提供 **获取 / 设置**
+  （`var_get` / `var_set`）节点，用数据线连接。
+- `branch` node: route execution on a boolean data input (真/假).
+  分支（`branch`）节点：按输入的布尔数据线分流（真/假）。
+- `swipe` node: upload a full-screen screenshot, mark ordered points (add / drag / double-click to
+  delete, with a zoomed preview), and press-drag through them 1→2→3 with a per-segment duration;
+  points are scaled from screenshot to real screen at run time.
+  滑动（`swipe`）节点：上传整屏截图，按顺序标点（可添加 / 拖动 / 双击删除，并有放大预览），
+  按住依次 1→2→3 滑动，每段可单独设时长；运行时按截图→屏幕比例换算坐标。
+
+### Changed 变更
+
+- Tasks now store pin-aware connections (`source_handle` / `target_handle` / `kind`) and a
+  `variables` list; older saved tasks are migrated on load on a best-effort basis.
+  任务现在保存带引脚的连线（`source_handle` / `target_handle` / `kind`）和 `variables` 列表；
+  旧任务在加载时尽力自动迁移。
+
+### Removed 移除
+
+- `set_var` and `check_var` nodes — replaced by typed variables (`var_get` / `var_set`) and the
+  `branch` node.
+  移除 设置变量 `set_var`、判断变量 `check_var` 节点 —— 由带类型的变量（`var_get` / `var_set`）
+  和 分支 节点取代。
+
 ## [0.1.0] - 2026-06-27
 
 First public version: a local engine plus a web node editor.
@@ -41,4 +82,5 @@ First public version: a local engine plus a web node editor.
 - Typing Chinese text reliably, and made the target image optional for `find_type`.
   修复中文文本输入；`find_type` 的目标图片改为可选。
 
+[0.2.0]: https://github.com/yyqyy/FlowPilot/releases/tag/v0.2.0
 [0.1.0]: https://github.com/yyqyy/FlowPilot/releases/tag/v0.1.0

@@ -2,12 +2,13 @@
 
 **Language / 语言:** [English](#english) · [中文](#中文)
 
-> An open-source, **local-first** visual desktop automation tool — like a Logitech-style macro
-> manager, but with a blueprint-style node editor. You wire up tasks in the browser; a local Python
-> engine runs them against the real desktop and listens for **global hotkeys** to start/stop them.
+> An open-source, **local-first** visual desktop automation tool. You wire up tasks in the browser
+> with a node graph — **execution wires** decide the order and **data wires** carry typed values —
+> and a local Python engine runs them against the real desktop, listening for **global hotkeys** to
+> start and stop them.
 >
-> 开源、**纯本地**的可视化桌面自动化工具 —— 类似罗技宏管理器，但用蓝图式节点编辑器搭建。
-> 你在浏览器里连好任务，本地的 Python 引擎在真实桌面上执行，并监听**全局快捷键**来启动/停止。
+> 开源、**纯本地**的可视化桌面自动化工具。在浏览器里用节点图搭建任务 —— **执行线**决定运行顺序、
+> **数据线**传递带类型的值 —— 本地的 Python 引擎在真实桌面上执行，并监听**全局快捷键**启动/停止。
 
 📖 **New here? Follow the step-by-step guide → [DEPLOYMENT.md](DEPLOYMENT.md)**
 （第一次使用？请按照保姆级教程操作 → [DEPLOYMENT.md](DEPLOYMENT.md)）
@@ -24,8 +25,9 @@ coordinates), so the same task works on any machine.
 
 ### How it works
 
-- **Web UI** (`web/`) — a node editor: find-and-click images, find-and-type, key presses, delays,
-  launch apps, conditions, loops, and variables.
+- **Web UI** (`web/`) — a node editor: find-and-click images, find-and-type, swipe gestures, key
+  presses, delays, launch apps, conditions/branches, loops, and typed variables wired together with
+  execution and data ports.
 - **Local engine** (`src/flowpilot/engine/`) — runs tasks with OpenCV template matching + direct
   input control, persists them locally, and registers global start/stop hotkeys.
 - The browser only edits and controls; the engine does the automation. Nothing is "exported" — your
@@ -61,17 +63,26 @@ web UI. Press `Ctrl+C` in the terminal to stop.
 | Node | What the engine does |
 | --- | --- |
 | 开始 / 结束 `start` / `stop` | Entry and exit of the graph |
-| 找图点击 `find_click` | Locate a template on screen, click its center (left/right/double + offset) |
-| 找图输入 `find_type` | Locate a field, click it, then type text |
+| 找图点击 `find_click` | Locate a template on screen, click its center (left/right/double + offset). Has **成功 / 失败** execution outputs and a **找到** boolean data output |
+| 找图输入 `find_type` | Locate a field, click it, then type text (or a string fed in by a data wire) |
 | 输入文本 `type_text` | Type into the focused window |
 | 按键 `key_press` | Press a key or combo (e.g. `ctrl+c`) |
 | 延迟 `delay` | Wait a fixed or random time |
 | 启动软件 `launch_app` | Start a program, optionally wait |
-| 判断 `condition` | Branch on whether a template is on screen (是/否) |
-| 循环 `loop` | Repeat the body a fixed number of times |
-| 条件循环 `loop_while` | Repeat the body while an image/variable condition holds |
-| 设置变量 `set_var` | Write a named boolean variable |
-| 判断变量 `check_var` | Branch on a named boolean variable (是/否) |
+| 滑动 `swipe` | Mark ordered points on a full-screen screenshot, then press-drag through them 1→2→3 with a per-segment duration |
+| 看图判断 `condition` | Branch on whether a template is on screen (真/假) and expose a **找到** boolean output |
+| 分支 `branch` | Route execution on a boolean data input (真/假) |
+| 重复循环 `loop` | Repeat the body a fixed number of times |
+| 条件循环 `loop_while` | Repeat the body while a boolean wire (or an image) condition holds |
+| 获取变量 / 设置变量 `var_get` / `var_set` | Read or write a typed variable via data wires |
+
+**Two kinds of wires.** White **square ports** are *execution wires* — they decide what runs next.
+Coloured **round ports** are *data wires* — they pass typed values between nodes. A node like
+找图点击 routes flow through **成功 / 失败** and also offers its result as a **找到** boolean that you
+can feed into a variable or a 分支.
+
+**Variables.** Declare variables in the side panel with a type — **布尔 / 文本 / 坐标点** — then drag
+their **获取 / 设置** nodes onto the canvas and connect them with data wires.
 
 Target images are picked or dragged onto the canvas and embedded (base64); the engine decodes and
 matches them in memory, so the same task works on any machine — no fixed coordinates.
@@ -125,7 +136,8 @@ FlowPilot 是一个**本地引擎 + 网页界面**的组合：你在浏览器里
 
 ### 工作原理
 
-- **网页界面**（`web/`）—— 节点编辑器：找图点击、找图输入、按键、延迟、启动软件、判断、循环、变量。
+- **网页界面**（`web/`）—— 节点编辑器：找图点击、找图输入、滑动、按键、延迟、启动软件、判断、分支、
+  循环、带类型的变量，用执行口与数据口连接成流程。
 - **本地引擎**（`src/flowpilot/engine/`）—— 用 OpenCV 模板匹配 + 直接输入控制来执行任务，本地持久化，
   并注册全局启动/停止快捷键。
 - 浏览器只负责编辑和控制，引擎负责真正的自动化。没有"导出"这一步 —— 任务就保存在引擎里、在那里运行。
@@ -158,17 +170,25 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 | 节点 | 引擎做的事 |
 | --- | --- |
 | 开始 / 结束 `start` / `stop` | 流程的起点与终点 |
-| 找图点击 `find_click` | 在屏幕上找到模板图，点击其中心（左键/右键/双击 + 偏移） |
-| 找图输入 `find_type` | 找到输入框，点击它，再输入文字 |
+| 找图点击 `find_click` | 在屏幕上找到模板图，点击其中心（左键/右键/双击 + 偏移）；有 **成功 / 失败** 执行口和 **找到** 布尔数据口 |
+| 找图输入 `find_type` | 找到输入框，点击它，再输入文字（也可由数据线传入文本） |
 | 输入文本 `type_text` | 向当前焦点窗口输入文字 |
 | 按键 `key_press` | 按下某个键或组合键（如 `ctrl+c`） |
 | 延迟 `delay` | 固定或随机等待一段时间 |
 | 启动软件 `launch_app` | 启动一个程序，可选择是否等待 |
-| 判断 `condition` | 根据某模板是否在屏幕上分支（是/否） |
-| 循环 `loop` | 把循环体重复固定次数 |
-| 条件循环 `loop_while` | 当图像/变量条件成立时重复循环体 |
-| 设置变量 `set_var` | 写入一个具名的布尔变量 |
-| 判断变量 `check_var` | 根据具名布尔变量分支（是/否） |
+| 滑动 `swipe` | 在整屏截图上按 1→2→3 顺序标点，按住依次滑到末点松开，每段可单独设时长 |
+| 看图判断 `condition` | 根据某模板是否在屏幕上分支（真/假），并提供 **找到** 布尔数据口 |
+| 分支 `branch` | 按输入的布尔数据线分流（真/假） |
+| 重复循环 `loop` | 把循环体重复固定次数 |
+| 条件循环 `loop_while` | 当布尔数据线（或图片）条件成立时重复循环体 |
+| 获取变量 / 设置变量 `var_get` / `var_set` | 通过数据线读取或写入一个带类型的变量 |
+
+**两种连线。** 白色**方口**是*执行线* —— 决定下一步运行谁；彩色**圆口**是*数据线* —— 在节点间传递
+带类型的值。像找图点击这样的节点会从 **成功 / 失败** 分流，同时把结果作为 **找到** 布尔值输出，可接到
+变量或 分支 节点。
+
+**变量。** 在侧边面板新建变量并选择类型 —— **布尔 / 文本 / 坐标点** —— 然后把它的 **获取 / 设置**
+节点拖到画布，用数据线连接。
 
 目标图片通过选择或拖拽放到画布上并以 base64 内嵌；引擎在内存里解码并匹配，所以同一个任务在任何机器上
 都能用 —— 没有固定坐标。

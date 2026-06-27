@@ -1,11 +1,19 @@
 import { Fragment } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 
-import type { FlowNode } from '../store'
-import { NODE_META, type WorkflowNodeData } from '../types'
+import { useStore, type FlowNode } from '../store'
+import {
+  inputPins,
+  NODE_SPECS,
+  outputPins,
+  PIN_COLORS,
+  type Pin,
+  type VariableType,
+  type WorkflowNodeData,
+} from '../types'
 import { ClickPreview } from './ClickPreview'
 
-const WITH_IMAGE = new Set(['find_type', 'condition', 'loop_while'])
+const WITH_TEMPLATE = new Set(['find_type', 'condition', 'loop_while'])
 
 function configSummary(data: WorkflowNodeData): string {
   const c = data.config
@@ -31,42 +39,86 @@ function configSummary(data: WorkflowNodeData): string {
     }
     case 'condition':
       return c.templateData || c.template ? '看到图片？' : '未选择图片'
+    case 'branch':
+      return '布尔为真？'
     case 'loop':
       return `重复 ${Number(c.count ?? 0)} 次`
-    case 'loop_while': {
-      const whileTrue = String(c.mode ?? 'true') === 'true'
-      if (String(c.source ?? 'image') === 'variable') {
-        const name = String(c.varName ?? '') || '变量'
-        return `当 ${name} 为${whileTrue ? '真' : '假'}时循环`
-      }
-      return whileTrue ? '看到图片时循环' : '看不到图片时循环'
+    case 'loop_while':
+      return '条件成立时循环'
+    case 'swipe': {
+      const n = Array.isArray(c.points) ? c.points.length : 0
+      return n >= 2 ? `${n} 个点滑动` : '未设置滑动点'
     }
-    case 'set_var': {
-      const name = String(c.name ?? '') || '变量'
-      return `${name} = ${c.value ? '真' : '假'}`
-    }
-    case 'check_var':
-      return String(c.name ?? '') ? `变量 ${String(c.name)}` : '未设置变量'
+    case 'var_get':
+      return String(c.name ?? '') ? `获取 ${String(c.name)}` : '未选择变量'
+    case 'var_set':
+      return String(c.name ?? '') ? `设置 ${String(c.name)}` : '未选择变量'
     default:
-      return NODE_META[data.kind].hint
+      return NODE_SPECS[data.kind].hint
   }
 }
 
+function topFor(index: number, count: number): string {
+  return `${((index + 1) / (count + 1)) * 100}%`
+}
+
 export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
-  const meta = NODE_META[data.kind]
+  const meta = NODE_SPECS[data.kind]
+  const variables = useStore((s) => s.variables)
+  const varType: VariableType | undefined =
+    data.kind === 'var_get' || data.kind === 'var_set'
+      ? variables.find((v) => v.name === data.config.name)?.type
+      : undefined
+
+  const colorOf = (pin: Pin): string =>
+    pin.kind === 'var' ? (varType ? PIN_COLORS[varType] : PIN_COLORS.var) : PIN_COLORS[pin.kind]
+
+  const inputs = inputPins(data.kind)
+  const outputs = outputPins(data.kind)
+
   const templateData = String(data.config.templateData ?? '')
-  const thumb = WITH_IMAGE.has(data.kind) ? templateData : ''
+  const thumb = WITH_TEMPLATE.has(data.kind)
+    ? templateData
+    : data.kind === 'swipe'
+      ? String(data.config.screenshotData ?? '')
+      : ''
   const clickImage = data.kind === 'find_click' ? templateData : ''
+
+  const renderPin = (pin: Pin, index: number, count: number, side: 'in' | 'out') => {
+    const top = topFor(index, count)
+    const color = colorOf(pin)
+    const isExec = pin.kind === 'exec'
+    return (
+      <Fragment key={`${side}-${pin.id}`}>
+        <Handle
+          id={pin.id}
+          type={side === 'in' ? 'target' : 'source'}
+          position={side === 'in' ? Position.Left : Position.Right}
+          className={`fp-pin ${isExec ? 'fp-pin-exec' : 'fp-pin-data'}`}
+          style={isExec ? { top } : { top, background: color, borderColor: color }}
+        />
+        {pin.label && (
+          <span
+            className={`fp-pin-label ${side === 'in' ? 'fp-pin-label-in' : 'fp-pin-label-out'}`}
+            style={{ top: `calc(${top} - 8px)` }}
+          >
+            {pin.label}
+          </span>
+        )}
+      </Fragment>
+    )
+  }
+
   return (
     <div
-      className="fp-node"
+      className={`fp-node${data.kind === 'var_get' ? ' fp-node-pure' : ''}`}
       style={{
         boxShadow: selected
           ? `0 0 0 2px ${meta.accent}, 0 12px 30px -12px ${meta.accent}99`
           : undefined,
       }}
     >
-      {meta.hasInput && <Handle type="target" position={Position.Left} className="fp-handle" />}
+      {inputs.map((pin, i) => renderPin(pin, i, inputs.length, 'in'))}
       <span className="fp-node-accent" style={{ background: meta.accent }} />
       <div className="fp-node-body">
         <div className="fp-node-title">{data.title}</div>
@@ -84,25 +136,7 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
         )}
         {thumb && <img className="fp-node-thumb" src={thumb} alt="" draggable={false} />}
       </div>
-
-      {meta.outputs ? (
-        meta.outputs.map((port) => (
-          <Fragment key={port.id}>
-            <Handle
-              id={port.id}
-              type="source"
-              position={Position.Right}
-              className="fp-handle"
-              style={{ top: port.top, borderColor: port.accent }}
-            />
-            <span className="fp-port-label" style={{ top: `calc(${port.top} - 9px)` }}>
-              {port.label}
-            </span>
-          </Fragment>
-        ))
-      ) : meta.hasOutput ? (
-        <Handle type="source" position={Position.Right} className="fp-handle" />
-      ) : null}
+      {outputs.map((pin, i) => renderPin(pin, i, outputs.length, 'out'))}
     </div>
   )
 }

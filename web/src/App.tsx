@@ -6,6 +6,7 @@ import { Inspector } from './components/Inspector'
 import { Palette } from './components/Palette'
 import { TaskList } from './components/TaskList'
 import { Toolbar } from './components/Toolbar'
+import { VariablesPanel } from './components/VariablesPanel'
 import { useStore } from './store'
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
           <div className="fp-side">
             <TaskList />
             <Palette />
+            <VariablesPanel />
           </div>
           <FlowCanvas />
           <Inspector />

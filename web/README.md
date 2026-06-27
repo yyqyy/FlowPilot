@@ -1,9 +1,10 @@
 # FlowPilot Studio (web UI)
 
-The visual, blueprint-style editor for FlowPilot automation tasks. It is the front-end of a
-**local tool**: you build node graphs here, and the local Python engine runs them against the real
-desktop — find images and click/type at them, branch on what's on screen, launch apps, and wait.
-Tasks start on demand or via a **global hotkey**.
+The visual node editor for FlowPilot automation tasks. It is the front-end of a **local tool**: you
+build node graphs here — wiring nodes with **execution ports** (run order) and **data ports** (typed
+values) — and the local Python engine runs them against the real desktop: find images and
+click/type/swipe at them, branch on what's on screen, launch apps, and wait. Tasks start on demand
+or via a **global hotkey**.
 
 This UI only edits and controls; the engine (in `src/flowpilot/engine`) does the automation and
 listens for hotkeys. There is no "export script" — tasks live in the engine and run there.
@@ -35,13 +36,21 @@ npm run build    # type-check + production build into dist/ (served by the engin
 
 | Node | What the engine does |
 | --- | --- |
-| 找图点击 find_click | Locate a template on screen, click its center (left/right/double, with offset) |
-| 找图输入 find_type | Locate a field, click it, then type text |
+| 找图点击 find_click | Locate a template, click its center (left/right/double + offset); 成功/失败 outputs + 找到 boolean |
+| 找图输入 find_type | Locate a field, click it, then type text (or a string from a data wire) |
 | 输入文本 type_text | Type into the focused window |
 | 按键 key_press | Press a key or combo (e.g. ctrl+c) |
 | 延迟 delay | Wait a fixed or random time |
 | 启动软件 launch_app | Start a program, optionally wait |
-| 判断 condition | Branch on whether a template is on screen (是/否 outputs) |
+| 滑动 swipe | Mark ordered points on a full-screen screenshot and press-drag through them, per-segment duration |
+| 看图判断 condition | Branch on whether a template is on screen (真/假) + 找到 boolean |
+| 分支 branch | Route execution on a boolean data input (真/假) |
+| 重复循环 loop | Repeat the body a fixed number of times |
+| 条件循环 loop_while | Repeat while a boolean wire (or image) condition holds |
+| 获取变量 / 设置变量 var_get / var_set | Read or write a typed variable (布尔 / 文本 / 坐标点) via data wires |
+
+White square ports are execution wires (run order); coloured round ports are data wires (typed
+values). Declare variables in the side panel and drag their Get/Set nodes onto the canvas.
 
 Target images are picked or dragged onto the canvas and embedded (base64); the engine decodes and
 matches them in memory, so the same task works on any machine — no fixed coordinates.

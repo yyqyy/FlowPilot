@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flowpilot-automation"
-version = "0.1.0"
-description = "A visual, node-based desktop automation studio."
+version = "0.2.0"
+description = "A visual, node-based desktop automation studio with execution and data wires."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

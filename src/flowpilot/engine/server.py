@@ -9,16 +9,15 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from flowpilot.engine.manager import EngineRuntime
-from flowpilot.engine.model import Node, NodeKind, Task, summarize
+from flowpilot.engine.model import Edge, Node, NodeKind, Task, summarize
 from flowpilot.engine.store import TaskStore
 
 
 def _starter_task(name: str) -> Task:
     start = Node(NodeKind.START, "开始", 80, 200)
     stop = Node(NodeKind.STOP, "结束", 520, 200)
-    task = Task(name=name, nodes=[start, stop])
-    task.edges = []
-    return task
+    edge = Edge(source=start.id, source_handle="then", target=stop.id, target_handle="exec")
+    return Task(name=name, nodes=[start, stop], edges=[edge])
 
 
 def web_dist() -> Path:

@@ -5,22 +5,26 @@
 - [x] Workflow file model and validation
 - [x] Dry-run executor
 - [x] Initial visual graph canvas
-- [ ] Connect ports interactively
-- [ ] Properties inspector for every node type
-- [ ] Global emergency-stop hotkey
+- [x] Connect ports interactively
+- [x] Properties inspector for every node type
+- [x] Global emergency-stop hotkey
 
 ## 0.2 — Screen-aware automation
 
 - [x] Region screenshot overlay for the primary display
 - [x] OpenCV template matching with confidence result
 - [x] Click matched image center
+- [x] Configured click offset
+- [x] Execution wires + data wires with typed ports
+- [x] Success / fail branches on find-image actions
+- [x] Swipe gesture node (multi-point, per-segment duration)
 - [ ] Multi-monitor region capture
-- [ ] Configured click offset
-- [ ] Retry, timeout, and not-found branches
+- [ ] Retry and timeout branches
 
 ## 0.3 — Reusable workflows
 
-- [ ] Conditions, loops, variables, and subflows
+- [x] Conditions, loops, and typed variables (boolean / text / point)
+- [ ] Subflows / reusable groups
 - [ ] Import/export portable workflow bundles
 - [ ] Execution log and per-node screenshots
 - [ ] Redaction of sensitive screen regions

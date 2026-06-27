@@ -4,12 +4,15 @@ import { ImagePlus } from 'lucide-react'
 import { useStore, type FlowNode } from '../store'
 import {
   defaultPostDelay,
-  NODE_META,
+  NODE_SPECS,
   TRIGGER_LABELS,
+  VARIABLE_TYPE_LABELS,
   type NodeKind,
   type TriggerMode,
+  type VariableType,
 } from '../types'
 import { ClickPreview } from './ClickPreview'
+import { SwipeEditor } from './SwipeEditor'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -132,6 +135,76 @@ function ImagePicker({ node }: { node: FlowNode }) {
   )
 }
 
+function VarPicker({ node }: { node: FlowNode }) {
+  const variables = useStore((s) => s.variables)
+  const updateConfig = useStore((s) => s.updateConfig)
+  const renameNode = useStore((s) => s.renameNode)
+  const name = String(node.data.config.name ?? '')
+  const verb = node.data.kind === 'var_get' ? '获取' : '设置'
+
+  if (variables.length === 0) {
+    return <div className="fp-inspector-empty">还没有变量。请在左侧「变量」面板新建一个。</div>
+  }
+  return (
+    <Field label="变量">
+      <select
+        className="fp-input"
+        value={name}
+        onChange={(e) => {
+          updateConfig(node.id, 'name', e.target.value)
+          renameNode(node.id, `${verb} ${e.target.value}`)
+        }}
+      >
+        <option value="">未选择</option>
+        {variables.map((v) => (
+          <option key={v.id} value={v.name}>
+            {v.name}（{VARIABLE_TYPE_LABELS[v.type]}）
+          </option>
+        ))}
+      </select>
+    </Field>
+  )
+}
+
+function VarValueEditor({ node, type }: { node: FlowNode; type: VariableType }) {
+  const updateConfig = useStore((s) => s.updateConfig)
+  const value = node.data.config.value
+  const set = (v: unknown) => updateConfig(node.id, 'value', v)
+
+  if (type === 'string') {
+    return (
+      <Field label="值（文本）">
+        <input className="fp-input" value={String(value ?? '')} onChange={(e) => set(e.target.value)} />
+      </Field>
+    )
+  }
+  if (type === 'point') {
+    const p = (value && typeof value === 'object' ? value : { x: 0, y: 0 }) as { x: number; y: number }
+    return (
+      <div className="fp-row">
+        <Field label="X">
+          <input className="fp-input" type="number" value={Number(p.x ?? 0)} onChange={(e) => set({ ...p, x: Number(e.target.value) })} />
+        </Field>
+        <Field label="Y">
+          <input className="fp-input" type="number" value={Number(p.y ?? 0)} onChange={(e) => set({ ...p, y: Number(e.target.value) })} />
+        </Field>
+      </div>
+    )
+  }
+  return (
+    <Field label="值（布尔）">
+      <div className="fp-segment fp-segment-2">
+        <button type="button" className={`fp-segment-item${value ? ' is-active' : ''}`} onClick={() => set(true)}>
+          真
+        </button>
+        <button type="button" className={`fp-segment-item${!value ? ' is-active' : ''}`} onClick={() => set(false)}>
+          假
+        </button>
+      </div>
+    </Field>
+  )
+}
+
 function TaskSettings() {
   const settings = useStore((s) => s.settings)
   const update = useStore((s) => s.updateSettings)
@@ -208,6 +281,8 @@ const PICKER_KINDS = new Set<NodeKind>(['find_click', 'find_type', 'condition'])
 
 export function Inspector() {
   const nodes = useStore((s) => s.nodes)
+  const edges = useStore((s) => s.edges)
+  const variables = useStore((s) => s.variables)
   const updateConfig = useStore((s) => s.updateConfig)
   const renameNode = useStore((s) => s.renameNode)
 
@@ -215,7 +290,7 @@ export function Inspector() {
   if (!node) return <TaskSettings />
 
   const { kind, title, config } = node.data
-  const meta = NODE_META[kind]
+  const meta = NODE_SPECS[kind]
   const setCfg = (key: string, value: unknown) => updateConfig(node.id, key, value)
 
   return (
@@ -262,13 +337,13 @@ export function Inspector() {
       )}
 
       {kind === 'find_type' && (
-        <Field label="输入文本">
+        <Field label="输入文本（也可连「文本」数据线覆盖）">
           <textarea className="fp-input fp-textarea" rows={4} value={String(config.text ?? '')} onChange={(e) => setCfg('text', e.target.value)} />
         </Field>
       )}
 
       {kind === 'type_text' && (
-        <Field label="文本内容">
+        <Field label="文本内容（也可连「文本」数据线覆盖）">
           <textarea className="fp-input fp-textarea" rows={5} value={String(config.text ?? '')} onChange={(e) => setCfg('text', e.target.value)} />
         </Field>
       )}
@@ -304,15 +379,12 @@ export function Inspector() {
         </>
       )}
 
-      {kind === 'condition' && (
-        <Field label="存入变量（可选）">
-          <input
-            className="fp-input"
-            placeholder="例如 seen —— 记录是否识别到"
-            value={String(config.result_var ?? '')}
-            onChange={(e) => setCfg('result_var', e.target.value)}
-          />
-        </Field>
+      {kind === 'swipe' && <SwipeEditor node={node} />}
+
+      {kind === 'branch' && (
+        <div className="fp-inspector-empty">
+          把一个布尔数据线连到左侧「条件」口。为真走「真」，为假走「假」。
+        </div>
       )}
 
       {kind === 'loop' && (
@@ -329,27 +401,14 @@ export function Inspector() {
 
       {kind === 'loop_while' && (
         <>
-          <Field label="循环条件来源">
-            <select className="fp-input" value={String(config.source ?? 'image')} onChange={(e) => setCfg('source', e.target.value)}>
-              <option value="image">看屏幕上的图片</option>
-              <option value="variable">看变量</option>
-            </select>
-          </Field>
-          {String(config.source ?? 'image') === 'image' ? (
-            <ImagePicker node={node} />
-          ) : (
-            <Field label="变量名">
-              <input className="fp-input" placeholder="例如 seen" value={String(config.varName ?? '')} onChange={(e) => setCfg('varName', e.target.value)} />
-            </Field>
-          )}
-          <Field label="循环条件">
+          <div className="fp-inspector-empty">
+            连一个布尔数据线到「条件」口即按它循环；不连则用下面的图片判断。
+          </div>
+          <ImagePicker node={node} />
+          <Field label="图片循环条件">
             <select className="fp-input" value={String(config.mode ?? 'true')} onChange={(e) => setCfg('mode', e.target.value)}>
-              <option value="true">
-                {String(config.source ?? 'image') === 'variable' ? '变量为真时继续循环' : '看到图片时继续循环'}
-              </option>
-              <option value="false">
-                {String(config.source ?? 'image') === 'variable' ? '变量为假时继续循环' : '看不到图片时继续循环'}
-              </option>
+              <option value="true">看到图片时继续循环</option>
+              <option value="false">看不到图片时继续循环</option>
             </select>
           </Field>
           <Field label="最大循环次数（保险，防止死循环）">
@@ -364,31 +423,27 @@ export function Inspector() {
         </>
       )}
 
-      {kind === 'set_var' && (
+      {kind === 'var_get' && <VarPicker node={node} />}
+
+      {kind === 'var_set' && (
         <>
-          <Field label="变量名">
-            <input className="fp-input" placeholder="例如 seen" value={String(config.name ?? '')} onChange={(e) => setCfg('name', e.target.value)} />
-          </Field>
-          <Field label="值">
-            <div className="fp-segment fp-segment-2">
-              <button type="button" className={`fp-segment-item${config.value ? ' is-active' : ''}`} onClick={() => setCfg('value', true)}>
-                真
-              </button>
-              <button type="button" className={`fp-segment-item${!config.value ? ' is-active' : ''}`} onClick={() => setCfg('value', false)}>
-                假
-              </button>
-            </div>
-          </Field>
+          <VarPicker node={node} />
+          {(() => {
+            const varType = variables.find((v) => v.name === config.name)?.type
+            if (!varType) return null
+            const wired = edges.some(
+              (e) => e.target === node.id && e.targetHandle === 'value' && e.data?.kind === 'data',
+            )
+            return wired ? (
+              <div className="fp-inspector-empty">值来自连入「值」口的数据线。</div>
+            ) : (
+              <VarValueEditor node={node} type={varType} />
+            )
+          })()}
         </>
       )}
 
-      {kind === 'check_var' && (
-        <Field label="变量名">
-          <input className="fp-input" placeholder="例如 seen" value={String(config.name ?? '')} onChange={(e) => setCfg('name', e.target.value)} />
-        </Field>
-      )}
-
-      {kind !== 'start' && kind !== 'stop' && (
+      {kind !== 'start' && kind !== 'stop' && kind !== 'var_get' && (
         <Field label="执行后等待（秒）">
           <input
             className="fp-input"

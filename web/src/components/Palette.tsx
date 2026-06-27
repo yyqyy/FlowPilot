@@ -1,20 +1,20 @@
 import {
   Clock,
-  Diamond,
   GitBranch,
   Keyboard,
   MousePointerClick,
+  Move,
   Plus,
   Repeat,
   Repeat2,
   Rocket,
+  Split,
   TextCursorInput,
   Type,
-  Variable,
 } from 'lucide-react'
 
 import { useStore } from '../store'
-import { NODE_META, type NodeKind } from '../types'
+import { NODE_SPECS, type NodeKind } from '../types'
 
 const ICONS: Record<string, typeof Plus> = {
   find_click: MousePointerClick,
@@ -23,11 +23,11 @@ const ICONS: Record<string, typeof Plus> = {
   key_press: Keyboard,
   delay: Clock,
   launch_app: Rocket,
+  swipe: Move,
   condition: GitBranch,
+  branch: Split,
   loop: Repeat,
   loop_while: Repeat2,
-  set_var: Variable,
-  check_var: Diamond,
 }
 
 const ADDABLE: NodeKind[] = [
@@ -37,11 +37,11 @@ const ADDABLE: NodeKind[] = [
   'key_press',
   'delay',
   'launch_app',
+  'swipe',
   'condition',
+  'branch',
   'loop',
   'loop_while',
-  'set_var',
-  'check_var',
 ]
 
 export function Palette() {
@@ -52,7 +52,7 @@ export function Palette() {
     <nav className="fp-palette">
       <div className="fp-palette-title">添加节点</div>
       {ADDABLE.map((kind, index) => {
-        const meta = NODE_META[kind]
+        const meta = NODE_SPECS[kind]
         const Icon = ICONS[kind] ?? Plus
         return (
           <button
@@ -79,8 +79,9 @@ export function Palette() {
         )
       })}
       <div className="fp-palette-tip">
-        从节点右侧圆点拖到另一个节点连线。判断有"是/否"、循环有"循环体/结束"两个出口（把循环体末尾连回循环节点即可重复）。
-        左键空白处框选多个节点，Ctrl+C/V 复制、Ctrl+D 原地复制。把图片拖到画布可直接生成找图点击节点。
+        白色方口是执行线（控制顺序），彩色圆口是数据线（传值）。从节点右侧的口拖到另一个节点左侧的口连线。
+        找图点击/判断有「成功·失败」或「真·假」出口。变量在下方面板新建后，把「获取/设置」拖到画布即可。
+        左键空白处框选，Ctrl+C/V 复制、Ctrl+D 原地复制；把图片拖到画布生成找图点击节点。
       </div>
     </nav>
   )
