@@ -55,11 +55,18 @@ class EngineRuntime:
             self._controller = PyAutoGuiController()
         return self._controller
 
-    def run(self, task_id: str) -> None:
+    def run(self, task_id: str, *, restart: bool = False) -> None:
         task = self.store.get(task_id)
         if task is None:
             raise KeyError(task_id)
-        self.stop(task_id)  # press-again restarts: abort any in-flight run first
+        if self.is_running(task_id):
+            if not restart:
+                # One press = one run. A second trigger while running is ignored
+                # rather than restarting, so accidental double-taps don't look
+                # like "nothing happened".
+                self.log(f"⏸ {task.name} 正在运行，忽略本次触发")
+                return
+            self.stop(task_id)  # explicit restart: abort the in-flight run first
 
         stop = threading.Event()
         controller = self._controller_instance()

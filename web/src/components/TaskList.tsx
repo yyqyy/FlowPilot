@@ -46,7 +46,11 @@ export function TaskList() {
               <div className="fp-task-info">
                 <span className="fp-task-name">{task.name}</span>
                 <span className="fp-task-meta">
-                  {TRIGGER_LABELS[task.trigger_mode]}
+                  {isRunning ? (
+                    <span className="fp-task-running">运行中</span>
+                  ) : (
+                    TRIGGER_LABELS[task.trigger_mode]
+                  )}
                   {task.hotkey && <span className="fp-kbd">{task.hotkey}</span>}
                 </span>
               </div>

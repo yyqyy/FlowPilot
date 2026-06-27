@@ -2,7 +2,13 @@ import { useRef, useState } from 'react'
 import { ImagePlus } from 'lucide-react'
 
 import { useStore, type FlowNode } from '../store'
-import { NODE_META, TRIGGER_LABELS, type NodeKind, type TriggerMode } from '../types'
+import {
+  defaultPostDelay,
+  NODE_META,
+  TRIGGER_LABELS,
+  type NodeKind,
+  type TriggerMode,
+} from '../types'
 import { ClickPreview } from './ClickPreview'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -296,6 +302,103 @@ export function Inspector() {
             <input className="fp-input" type="number" min={0} step={0.5} value={Number(config.wait_seconds ?? 1)} onChange={(e) => setCfg('wait_seconds', Number(e.target.value))} />
           </Field>
         </>
+      )}
+
+      {kind === 'condition' && (
+        <Field label="存入变量（可选）">
+          <input
+            className="fp-input"
+            placeholder="例如 seen —— 记录是否识别到"
+            value={String(config.result_var ?? '')}
+            onChange={(e) => setCfg('result_var', e.target.value)}
+          />
+        </Field>
+      )}
+
+      {kind === 'loop' && (
+        <Field label="循环次数">
+          <input
+            className="fp-input"
+            type="number"
+            min={1}
+            value={Number(config.count ?? 1)}
+            onChange={(e) => setCfg('count', Math.max(1, Number(e.target.value)))}
+          />
+        </Field>
+      )}
+
+      {kind === 'loop_while' && (
+        <>
+          <Field label="循环条件来源">
+            <select className="fp-input" value={String(config.source ?? 'image')} onChange={(e) => setCfg('source', e.target.value)}>
+              <option value="image">看屏幕上的图片</option>
+              <option value="variable">看变量</option>
+            </select>
+          </Field>
+          {String(config.source ?? 'image') === 'image' ? (
+            <ImagePicker node={node} />
+          ) : (
+            <Field label="变量名">
+              <input className="fp-input" placeholder="例如 seen" value={String(config.varName ?? '')} onChange={(e) => setCfg('varName', e.target.value)} />
+            </Field>
+          )}
+          <Field label="循环条件">
+            <select className="fp-input" value={String(config.mode ?? 'true')} onChange={(e) => setCfg('mode', e.target.value)}>
+              <option value="true">
+                {String(config.source ?? 'image') === 'variable' ? '变量为真时继续循环' : '看到图片时继续循环'}
+              </option>
+              <option value="false">
+                {String(config.source ?? 'image') === 'variable' ? '变量为假时继续循环' : '看不到图片时继续循环'}
+              </option>
+            </select>
+          </Field>
+          <Field label="最大循环次数（保险，防止死循环）">
+            <input
+              className="fp-input"
+              type="number"
+              min={1}
+              value={Number(config.max_iterations ?? 100)}
+              onChange={(e) => setCfg('max_iterations', Math.max(1, Number(e.target.value)))}
+            />
+          </Field>
+        </>
+      )}
+
+      {kind === 'set_var' && (
+        <>
+          <Field label="变量名">
+            <input className="fp-input" placeholder="例如 seen" value={String(config.name ?? '')} onChange={(e) => setCfg('name', e.target.value)} />
+          </Field>
+          <Field label="值">
+            <div className="fp-segment fp-segment-2">
+              <button type="button" className={`fp-segment-item${config.value ? ' is-active' : ''}`} onClick={() => setCfg('value', true)}>
+                真
+              </button>
+              <button type="button" className={`fp-segment-item${!config.value ? ' is-active' : ''}`} onClick={() => setCfg('value', false)}>
+                假
+              </button>
+            </div>
+          </Field>
+        </>
+      )}
+
+      {kind === 'check_var' && (
+        <Field label="变量名">
+          <input className="fp-input" placeholder="例如 seen" value={String(config.name ?? '')} onChange={(e) => setCfg('name', e.target.value)} />
+        </Field>
+      )}
+
+      {kind !== 'start' && kind !== 'stop' && (
+        <Field label="执行后等待（秒）">
+          <input
+            className="fp-input"
+            type="number"
+            min={0}
+            step={0.1}
+            value={Number(config.post_delay ?? defaultPostDelay(kind))}
+            onChange={(e) => setCfg('post_delay', Math.max(0, Number(e.target.value)))}
+          />
+        </Field>
       )}
 
       {(kind === 'start' || kind === 'stop') && (

@@ -14,7 +14,7 @@ export default function App() {
 
   useEffect(() => {
     init()
-    const timer = setInterval(() => refreshStatus(), 1200)
+    const timer = setInterval(() => refreshStatus(), 800)
     return () => clearInterval(timer)
   }, [init, refreshStatus])
 

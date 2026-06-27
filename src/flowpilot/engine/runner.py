@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from flowpilot.engine.actions import InputController, decode_template
-from flowpilot.engine.model import Node, NodeKind, Task, TriggerMode
+from flowpilot.engine.model import BRANCHING, Node, NodeKind, Task, TriggerMode
 from flowpilot.screen import MatchResult
 
 
@@ -35,6 +35,27 @@ def _float(config: dict, key: str, default: float) -> float:
         return default
 
 
+def _as_bool(value: object) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on", "是")
+    return bool(value)
+
+
+# Default "wait after this node runs" per kind. Screen-affecting actions pause 1s
+# so the UI can react before the next find/click; control-flow nodes don't wait.
+# Read from node.config["post_delay"] when present, so each node can override it.
+_POST_DELAY_DEFAULT: dict[NodeKind, float] = {
+    NodeKind.FIND_CLICK: 1.0,
+    NodeKind.FIND_TYPE: 1.0,
+    NodeKind.TYPE_TEXT: 1.0,
+    NodeKind.KEY_PRESS: 1.0,
+}
+
+
+def _post_delay(node: Node) -> float:
+    return _float(node.config, "post_delay", _POST_DELAY_DEFAULT.get(node.kind, 0.0))
+
+
 @dataclass
 class RunContext:
     controller: InputController
@@ -42,6 +63,8 @@ class RunContext:
     stop: threading.Event
     log: LogSink
     last_match: MatchResult | None = field(default=None)
+    vars: dict[str, bool] = field(default_factory=dict)
+    loop_counters: dict[str, int] = field(default_factory=dict)
 
 
 def interruptible_sleep(seconds: float, stop: threading.Event) -> None:
@@ -130,10 +153,63 @@ def _execute(node: Node, ctx: RunContext) -> tuple[bool, str | None]:
 
     if node.kind == NodeKind.CONDITION:
         found = _locate_config(node, ctx) is not None
-        ctx.log(f"  判断：{'找到' if found else '未找到'}")
+        result_var = str(node.config.get("result_var", "")).strip()
+        if result_var:
+            ctx.vars[result_var] = found
+            ctx.log(f"  判断：{'找到' if found else '未找到'} → {result_var}={found}")
+        else:
+            ctx.log(f"  判断：{'找到' if found else '未找到'}")
         return False, "true" if found else "false"
 
+    if node.kind == NodeKind.SET_VAR:
+        name = str(node.config.get("name", "")).strip()
+        value = _as_bool(node.config.get("value", True))
+        if name:
+            ctx.vars[name] = value
+            ctx.log(f"  设置变量 {name} = {value}")
+        return False, None
+
+    if node.kind == NodeKind.CHECK_VAR:
+        name = str(node.config.get("name", "")).strip()
+        value = bool(ctx.vars.get(name, False))
+        ctx.log(f"  变量 {name} = {value}")
+        return False, "true" if value else "false"
+
+    if node.kind == NodeKind.LOOP:
+        count = _int(node.config, "count", 1)
+        seen = ctx.loop_counters.get(node.id, 0)
+        if seen < count:
+            ctx.loop_counters[node.id] = seen + 1
+            ctx.log(f"  循环 {seen + 1}/{count}")
+            return False, "body"
+        ctx.loop_counters[node.id] = 0
+        return False, "done"
+
+    if node.kind == NodeKind.LOOP_WHILE:
+        max_it = _int(node.config, "max_iterations", 1000)
+        seen = ctx.loop_counters.get(node.id, 0)
+        if seen < max_it and _loop_condition_met(node, ctx):
+            ctx.loop_counters[node.id] = seen + 1
+            ctx.log(f"  条件循环 第 {seen + 1} 次")
+            return False, "body"
+        ctx.loop_counters[node.id] = 0
+        if seen >= max_it:
+            ctx.log("  达到最大循环次数")
+        return False, "done"
+
     return False, None
+
+
+def _loop_condition_met(node: Node, ctx: RunContext) -> bool:
+    """Evaluate a loop_while node's condition. `mode` picks whether the loop
+    continues while the condition is true ("true") or false ("false")."""
+    source = str(node.config.get("source", "image"))
+    if source == "variable":
+        value = bool(ctx.vars.get(str(node.config.get("varName", "")), False))
+    else:
+        value = _locate_config(node, ctx) is not None
+    mode = str(node.config.get("mode", "true"))
+    return value if mode == "true" else not value
 
 
 def _walk(task: Task, ctx: RunContext) -> None:
@@ -141,6 +217,7 @@ def _walk(task: Task, ctx: RunContext) -> None:
     if current is None:
         ctx.log("没有 Start 节点，无法运行")
         return
+    ctx.loop_counters.clear()
     steps = 0
     while current is not None and not ctx.stop.is_set():
         steps += 1
@@ -150,8 +227,13 @@ def _walk(task: Task, ctx: RunContext) -> None:
         stop_run, branch = _execute(current, ctx)
         if stop_run:
             return
+        delay = _post_delay(current)
+        if delay > 0:
+            interruptible_sleep(delay, ctx.stop)
+            if ctx.stop.is_set():
+                return
         edges = task.outgoing(current.id)
-        if current.kind == NodeKind.CONDITION:
+        if current.kind in BRANCHING:
             edge = next((e for e in edges if e.label == branch), None)
             if edge is None:
                 edge = next((e for e in edges if e.label == "next"), None)

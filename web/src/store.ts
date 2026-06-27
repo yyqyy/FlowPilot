@@ -14,6 +14,7 @@ import { api } from './api'
 import {
   defaultConfig,
   defaultTitle,
+  portLabel,
   type NodeKind,
   type Task,
   type TaskSummary,
@@ -86,6 +87,9 @@ interface StoreState {
   updateConfig: (id: string, key: string, value: unknown) => void
   renameNode: (id: string, title: string) => void
   removeSelected: () => void
+  copySelection: () => void
+  paste: () => void
+  duplicateSelected: () => void
   updateSettings: (patch: Partial<Settings>) => void
 
   buildTask: () => Task | null
@@ -102,6 +106,9 @@ const DEFAULT_SETTINGS: Settings = {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+// Copy/paste buffer for box-selected nodes (UE5-blueprint style duplication).
+let clipboard: { nodes: FlowNode[]; edges: FlowEdge[] } | null = null
 
 export const useStore = create<StoreState>((set, get) => ({
   tasks: [],
@@ -157,7 +164,7 @@ export const useStore = create<StoreState>((set, get) => ({
       source: e.source,
       target: e.target,
       sourceHandle: e.label && e.label !== 'next' ? e.label : null,
-      label: e.label === 'true' ? '是' : e.label === 'false' ? '否' : undefined,
+      label: portLabel(e.label),
       ...EDGE_STYLE,
     }))
     set({
@@ -233,7 +240,7 @@ export const useStore = create<StoreState>((set, get) => ({
         source,
         target,
         sourceHandle: sourceHandle ?? null,
-        label: label === 'true' ? '是' : label === 'false' ? '否' : undefined,
+        label: portLabel(label),
         ...EDGE_STYLE,
       }
       return { edges: addEdge(edge, pruned) }
@@ -317,6 +324,51 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     })
     get().scheduleSave()
+  },
+
+  copySelection: () => {
+    const { nodes, edges } = get()
+    const selected = nodes.filter(
+      (n) => n.selected && n.data.kind !== 'start' && n.data.kind !== 'stop',
+    )
+    if (selected.length === 0) return
+    const ids = new Set(selected.map((n) => n.id))
+    clipboard = {
+      nodes: selected.map((n) => ({ ...n, data: { ...n.data, config: { ...n.data.config } } })),
+      edges: edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
+    }
+  },
+
+  paste: () => {
+    if (!clipboard || clipboard.nodes.length === 0) return
+    const idMap = new Map<string, string>()
+    const OFFSET = 48
+    const newNodes: FlowNode[] = clipboard.nodes.map((n) => {
+      const id = newId(n.data.kind)
+      idMap.set(n.id, id)
+      return {
+        ...n,
+        id,
+        position: { x: n.position.x + OFFSET, y: n.position.y + OFFSET },
+        selected: true,
+        data: { ...n.data, config: { ...n.data.config } },
+      }
+    })
+    const newEdges: FlowEdge[] = clipboard.edges.map((e) => {
+      const source = idMap.get(e.source) as string
+      const target = idMap.get(e.target) as string
+      return { ...e, id: `e-${source}-${target}-${edgeLabel(e)}`, source, target, selected: false }
+    })
+    set((s) => ({
+      nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), ...newNodes],
+      edges: [...s.edges, ...newEdges],
+    }))
+    get().scheduleSave()
+  },
+
+  duplicateSelected: () => {
+    get().copySelection()
+    get().paste()
   },
 
   updateSettings: (patch) => {

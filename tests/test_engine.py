@@ -65,7 +65,7 @@ def test_find_click_clicks_match_center_with_offset() -> None:
     find = Node(
         NodeKind.FIND_CLICK,
         "点按钮",
-        config={"templateData": png_data_url(), "offsetX": 5, "offsetY": -3},
+        config={"templateData": png_data_url(), "offsetX": 5, "offsetY": -3, "post_delay": 0},
     )
     stop = Node(NodeKind.STOP, "结束")
     task = Task(
@@ -83,7 +83,7 @@ def test_find_click_clicks_match_center_with_offset() -> None:
 
 def test_find_type_without_template_types_directly() -> None:
     start = Node(NodeKind.START, "开始")
-    find = Node(NodeKind.FIND_TYPE, "输入", config={"text": "你好"})
+    find = Node(NodeKind.FIND_TYPE, "输入", config={"text": "你好", "post_delay": 0})
     stop = Node(NodeKind.STOP, "结束")
     task = Task(nodes=[start, find, stop], edges=[Edge(start.id, find.id), Edge(find.id, stop.id)])
     controller = FakeController()
@@ -97,7 +97,11 @@ def test_find_type_without_template_types_directly() -> None:
 
 def test_find_type_with_template_clicks_then_types() -> None:
     start = Node(NodeKind.START, "开始")
-    find = Node(NodeKind.FIND_TYPE, "输入", config={"templateData": png_data_url(), "text": "abc"})
+    find = Node(
+        NodeKind.FIND_TYPE,
+        "输入",
+        config={"templateData": png_data_url(), "text": "abc", "post_delay": 0},
+    )
     stop = Node(NodeKind.STOP, "结束")
     task = Task(nodes=[start, find, stop], edges=[Edge(start.id, find.id), Edge(find.id, stop.id)])
     controller = FakeController()
@@ -114,8 +118,8 @@ def test_condition_branches_on_image_presence() -> None:
     def build() -> tuple[Task, FakeController]:
         start = Node(NodeKind.START, "开始")
         cond = Node(NodeKind.CONDITION, "看到了吗", config={"templateData": png_data_url()})
-        yes = Node(NodeKind.TYPE_TEXT, "是", config={"text": "yes"})
-        no = Node(NodeKind.TYPE_TEXT, "否", config={"text": "no"})
+        yes = Node(NodeKind.TYPE_TEXT, "是", config={"text": "yes", "post_delay": 0})
+        no = Node(NodeKind.TYPE_TEXT, "否", config={"text": "no", "post_delay": 0})
         stop = Node(NodeKind.STOP, "结束")
         task = Task(
             nodes=[start, cond, yes, no, stop],
@@ -143,7 +147,7 @@ def test_condition_branches_on_image_presence() -> None:
 
 def test_times_mode_runs_repeat_times() -> None:
     start = Node(NodeKind.START, "开始")
-    key = Node(NodeKind.KEY_PRESS, "按键", config={"keys": "a"})
+    key = Node(NodeKind.KEY_PRESS, "按键", config={"keys": "a", "post_delay": 0})
     stop = Node(NodeKind.STOP, "结束")
     task = Task(
         trigger_mode=TriggerMode.TIMES,
@@ -165,7 +169,7 @@ def test_loop_mode_stops_when_event_set() -> None:
             stop_event.set()  # stop after the first iteration
 
     start = Node(NodeKind.START, "开始")
-    key = Node(NodeKind.KEY_PRESS, "按键", config={"keys": "a"})
+    key = Node(NodeKind.KEY_PRESS, "按键", config={"keys": "a", "post_delay": 0})
     stop = Node(NodeKind.STOP, "结束")
     task = Task(
         trigger_mode=TriggerMode.LOOP,
@@ -209,6 +213,139 @@ def test_manager_run_then_stop(tmp_path) -> None:
     assert runtime.is_running(task.id)
     runtime.stop(task.id)
 
+    for _ in range(40):
+        if not runtime.is_running(task.id):
+            break
+        time.sleep(0.05)
+    assert not runtime.is_running(task.id)
+
+
+def test_post_delay_defaults_per_kind() -> None:
+    from flowpilot.engine.runner import _post_delay
+
+    assert _post_delay(Node(NodeKind.KEY_PRESS, "k", config={"keys": "a"})) == 1.0
+    assert _post_delay(Node(NodeKind.KEY_PRESS, "k", config={"post_delay": 0.3})) == 0.3
+    assert _post_delay(Node(NodeKind.DELAY, "d")) == 0.0
+    assert _post_delay(Node(NodeKind.CONDITION, "c")) == 0.0
+
+
+def test_loop_repeats_body_fixed_count() -> None:
+    start = Node(NodeKind.START, "开始")
+    loop = Node(NodeKind.LOOP, "循环", config={"count": 3})
+    key = Node(NodeKind.KEY_PRESS, "按键", config={"keys": "a", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, loop, key, stop],
+        edges=[
+            Edge(start.id, loop.id),
+            Edge(loop.id, key.id, "body"),
+            Edge(key.id, loop.id),  # body loops back into the loop node
+            Edge(loop.id, stop.id, "done"),
+        ],
+    )
+    controller = FakeController()
+    status = run_task(task, controller=controller, locator=FakeLocator(None), stop=threading.Event())
+    assert status == "completed"
+    assert sum(1 for e in controller.events if e[0] == "press") == 3
+
+
+def test_loop_while_image_respects_max_iterations() -> None:
+    start = Node(NodeKind.START, "开始")
+    loop = Node(
+        NodeKind.LOOP_WHILE,
+        "条件循环",
+        config={"source": "image", "templateData": png_data_url(), "mode": "true", "max_iterations": 2},
+    )
+    key = Node(NodeKind.KEY_PRESS, "按键", config={"keys": "a", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, loop, key, stop],
+        edges=[
+            Edge(start.id, loop.id),
+            Edge(loop.id, key.id, "body"),
+            Edge(key.id, loop.id),
+            Edge(loop.id, stop.id, "done"),
+        ],
+    )
+    controller = FakeController()
+    run_task(task, controller=controller, locator=FakeLocator(MatchResult(0, 0, 4, 4, 0.9)),
+             stop=threading.Event())
+    assert sum(1 for e in controller.events if e[0] == "press") == 2
+
+
+def test_loop_while_variable_stops_when_var_flips() -> None:
+    start = Node(NodeKind.START, "开始")
+    setup = Node(NodeKind.SET_VAR, "开", config={"name": "go", "value": True})
+    loop = Node(
+        NodeKind.LOOP_WHILE,
+        "条件循环",
+        config={"source": "variable", "varName": "go", "mode": "true", "max_iterations": 50},
+    )
+    flip = Node(NodeKind.SET_VAR, "关", config={"name": "go", "value": False})
+    key = Node(NodeKind.KEY_PRESS, "按键", config={"keys": "a", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, setup, loop, flip, key, stop],
+        edges=[
+            Edge(start.id, setup.id),
+            Edge(setup.id, loop.id),
+            Edge(loop.id, flip.id, "body"),
+            Edge(flip.id, key.id),
+            Edge(key.id, loop.id),
+            Edge(loop.id, stop.id, "done"),
+        ],
+    )
+    controller = FakeController()
+    run_task(task, controller=controller, locator=FakeLocator(None), stop=threading.Event())
+    assert sum(1 for e in controller.events if e[0] == "press") == 1
+
+
+def test_condition_result_var_feeds_check_var() -> None:
+    start = Node(NodeKind.START, "开始")
+    cond = Node(NodeKind.CONDITION, "看到了吗", config={"templateData": png_data_url(), "result_var": "seen"})
+    check = Node(NodeKind.CHECK_VAR, "判断变量", config={"name": "seen"})
+    yes = Node(NodeKind.TYPE_TEXT, "是", config={"text": "yes", "post_delay": 0})
+    no = Node(NodeKind.TYPE_TEXT, "否", config={"text": "no", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, cond, check, yes, no, stop],
+        edges=[
+            Edge(start.id, cond.id),
+            Edge(cond.id, check.id, "true"),
+            Edge(cond.id, check.id, "false"),
+            Edge(check.id, yes.id, "true"),
+            Edge(check.id, no.id, "false"),
+            Edge(yes.id, stop.id),
+            Edge(no.id, stop.id),
+        ],
+    )
+    controller = FakeController()
+    run_task(task, controller=controller, locator=FakeLocator(MatchResult(0, 0, 4, 4, 0.9)),
+             stop=threading.Event())
+    assert ("type", "yes") in controller.events
+    assert ("type", "no") not in controller.events
+
+
+def test_run_ignores_retrigger_while_running(tmp_path) -> None:
+    store = TaskStore(tmp_path)
+    start = Node(NodeKind.START, "开始")
+    delay = Node(NodeKind.DELAY, "等", config={"min_seconds": 0.2, "max_seconds": 0.2})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        trigger_mode=TriggerMode.LOOP,
+        nodes=[start, delay, stop],
+        edges=[Edge(start.id, delay.id), Edge(delay.id, stop.id)],
+    )
+    store.save(task)
+    runtime = EngineRuntime(store, locator=FakeLocator(None), controller=FakeController(),
+                            binder=DummyBinder())
+
+    runtime.run(task.id)
+    first = runtime._threads[task.id]
+    runtime.run(task.id)  # ignored while running: same thread, no restart
+    assert runtime._threads[task.id] is first
+
+    runtime.stop(task.id)
     for _ in range(40):
         if not runtime.is_running(task.id):
             break

@@ -15,11 +15,16 @@ class NodeKind(StrEnum):
     DELAY = "delay"                # fixed or random wait
     LAUNCH_APP = "launch_app"      # start a program, optionally wait
     CONDITION = "condition"        # branch on whether a template is on screen
+    LOOP = "loop"                  # repeat the body a fixed number of times
+    LOOP_WHILE = "loop_while"      # repeat the body while a condition holds
+    SET_VAR = "set_var"            # write a named boolean variable
+    CHECK_VAR = "check_var"        # branch on a named boolean variable
     STOP = "stop"
 
 
 # Node kinds that branch to two labelled edges instead of a single "next".
-BRANCHING = {NodeKind.CONDITION}
+# CONDITION / CHECK_VAR use "true"/"false"; loops use "body"/"done".
+BRANCHING = {NodeKind.CONDITION, NodeKind.CHECK_VAR, NodeKind.LOOP, NodeKind.LOOP_WHILE}
 
 
 @dataclass(slots=True)

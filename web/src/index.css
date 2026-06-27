@@ -112,6 +112,11 @@ body {
   flex: 1;
 }
 
+.fp-toolbar-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .fp-status {
   display: inline-flex;
   align-items: center;
@@ -666,6 +671,39 @@ body {
   color: #fca5a5;
   border-color: #ef4444;
   background: rgba(239, 68, 68, 0.12);
+  animation: fp-pulse 1.4s ease-out infinite;
+}
+
+@keyframes fp-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(239, 68, 68, 0);
+  }
+}
+
+.fp-task-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #fca5a5;
+}
+
+.fp-task-running::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: fp-blink 1s steps(2, start) infinite;
+}
+
+@keyframes fp-blink {
+  50% {
+    opacity: 0.25;
+  }
 }
 
 .fp-task-info {
@@ -726,6 +764,10 @@ body {
   border-radius: 10px;
   background: var(--panel-2);
   border: 1px solid var(--border);
+}
+
+.fp-segment-2 {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .fp-segment-item {
