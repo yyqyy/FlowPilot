@@ -10,3 +10,16 @@ build/
 *.flowpilot.local.json
 captures/
 assets/templates/*.png
+
+# Runtime logs (task data lives in %APPDATA%\FlowPilot, outside the repo)
+*.log
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini

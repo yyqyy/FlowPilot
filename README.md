@@ -1,67 +1,103 @@
 # FlowPilot
 
-FlowPilot is an open-source, **local** visual automation tool — like a Logitech-style macro manager,
-but with a blueprint-style node editor. You wire up tasks in the browser UI; a local Python engine
-runs them against the real desktop and listens for **global hotkeys** to start/stop them.
+**Language / 语言:** [English](#english) · [中文](#中文)
 
-> Status: early MVP. The product is a **local engine + web UI**: build node-graph tasks, bind
-> hotkeys, and run them. Image targets are matched on screen (no fixed coordinates), so the same
-> task works on any machine.
+> An open-source, **local-first** visual desktop automation tool — like a Logitech-style macro
+> manager, but with a blueprint-style node editor. You wire up tasks in the browser; a local Python
+> engine runs them against the real desktop and listens for **global hotkeys** to start/stop them.
+>
+> 开源、**纯本地**的可视化桌面自动化工具 —— 类似罗技宏管理器，但用蓝图式节点编辑器搭建。
+> 你在浏览器里连好任务，本地的 Python 引擎在真实桌面上执行，并监听**全局快捷键**来启动/停止。
 
-## How it works
+📖 **New here? Follow the step-by-step guide → [DEPLOYMENT.md](DEPLOYMENT.md)**
+（第一次使用？请按照保姆级教程操作 → [DEPLOYMENT.md](DEPLOYMENT.md)）
+
+---
+
+## English
+
+FlowPilot is a **local engine + web UI**: build node-graph tasks in the browser, bind hotkeys, and
+run them against your own desktop. Image targets are matched on screen with OpenCV (no fixed
+coordinates), so the same task works on any machine.
+
+> Status: early MVP.
+
+### How it works
 
 - **Web UI** (`web/`) — a node editor: find-and-click images, find-and-type, key presses, delays,
-  launch apps, and a condition node that branches on what's on screen.
+  launch apps, conditions, loops, and variables.
 - **Local engine** (`src/flowpilot/engine/`) — runs tasks with OpenCV template matching + direct
   input control, persists them locally, and registers global start/stop hotkeys.
 - The browser only edits and controls; the engine does the automation. Nothing is "exported" — your
   tasks live in the engine and run there.
 
-## Run it (Windows)
+### Quick start (Windows)
 
-One command — sets everything up on first run, then starts the engine and opens the browser:
+**Prerequisites:** Windows 10/11, [Python 3.11+](https://www.python.org/downloads/) (tested on
+3.13), and [Node.js 18+](https://nodejs.org/) (tested on 22). Make sure both are on your `PATH`.
+
+One command — it sets everything up on first run, then starts the engine and opens the browser:
 
 ```powershell
 .\start.ps1
+```
+
+If PowerShell refuses to run the script (`running scripts is disabled`), use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
 `start.ps1` creates the virtual environment, installs dependencies, builds the web UI on first run,
 and launches the engine at **http://127.0.0.1:8765**. Use `.\start.ps1 -Rebuild` after changing the
 web UI. Press `Ctrl+C` in the terminal to stop.
 
-<details>
-<summary>Manual steps (or non-Windows)</summary>
+> 👉 If anything goes wrong (Python/Node not found, port in use, hotkeys not firing), the
+> **[full deployment guide](DEPLOYMENT.md)** has prerequisites, manual steps, and troubleshooting
+> for every common error.
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
-cd web; npm install; npm run build; cd ..   # build the UI once
-flowpilot-studio                            # serves UI + engine at http://127.0.0.1:8765
-```
+### Node types
 
-</details>
+| Node | What the engine does |
+| --- | --- |
+| 开始 / 结束 `start` / `stop` | Entry and exit of the graph |
+| 找图点击 `find_click` | Locate a template on screen, click its center (left/right/double + offset) |
+| 找图输入 `find_type` | Locate a field, click it, then type text |
+| 输入文本 `type_text` | Type into the focused window |
+| 按键 `key_press` | Press a key or combo (e.g. `ctrl+c`) |
+| 延迟 `delay` | Wait a fixed or random time |
+| 启动软件 `launch_app` | Start a program, optionally wait |
+| 判断 `condition` | Branch on whether a template is on screen (是/否) |
+| 循环 `loop` | Repeat the body a fixed number of times |
+| 条件循环 `loop_while` | Repeat the body while an image/variable condition holds |
+| 设置变量 `set_var` | Write a named boolean variable |
+| 判断变量 `check_var` | Branch on a named boolean variable (是/否) |
 
-Build a task, optionally bind a start hotkey, and press it anywhere. Each task runs **once /
-multiple times / loop**; pressing the start hotkey again restarts it; the stop hotkey (or moving the
-mouse into a screen corner) aborts it. See [web/README.md](web/README.md) for the node reference.
+Target images are picked or dragged onto the canvas and embedded (base64); the engine decodes and
+matches them in memory, so the same task works on any machine — no fixed coordinates.
 
-> Global hotkeys may require running the terminal as Administrator on some systems. The toolbar
+### Triggers
+
+Each task runs **once / multiple times / loop**, can bind a **start hotkey** and a **stop hotkey**,
+and pressing the start hotkey again restarts the task from the beginning. The stop hotkey — or
+slamming the mouse into a screen corner (PyAutoGUI fail-safe) — aborts it.
+
+> Global hotkeys may require running the terminal as **Administrator** on some systems. The toolbar
 > shows whether hotkey listening is active; you can always run tasks from the ▶ button.
 
-## Why FlowPilot?
+### Why FlowPilot?
 
 Many automation tools are either code-only or tied to fixed pixel coordinates that break on a
 different screen. FlowPilot makes screen-aware automation visual and editable, and targets images
 instead of coordinates so tasks are portable across machines.
 
-## Safety and responsible use
+### Safety and responsible use
 
 Use FlowPilot only on software, accounts, and devices you own or are authorized to automate.
 Do not use it to bypass anti-cheat systems, CAPTCHAs, access controls, rate limits, or a service's
 rules. A stop hotkey and the PyAutoGUI fail-safe (slam the mouse to a corner) are core requirements.
 
-## Development
+### Development
 
 ```powershell
 python -m venv .venv
@@ -70,15 +106,102 @@ pip install -e ".[dev]"
 flowpilot-studio
 ```
 
-Run tests with `pytest`.
+Run tests with `pytest`. Contribution notes are in [CONTRIBUTING.md](CONTRIBUTING.md); the roadmap is
+in [ROADMAP.md](ROADMAP.md).
 
-Contribution notes are in [CONTRIBUTING.md](CONTRIBUTING.md).
+### License
 
-## Roadmap
+MIT
 
-See [ROADMAP.md](ROADMAP.md). Contributions and real-world, permission-safe workflow examples
-are welcome.
+---
 
-## License
+## 中文
+
+FlowPilot 是一个**本地引擎 + 网页界面**的组合：你在浏览器里搭建节点流程、绑定快捷键，然后在
+自己的桌面上运行它。图像目标由 OpenCV 在屏幕上实时匹配（不依赖固定坐标），所以同一个任务在任何
+机器上都能用。
+
+> 状态：早期 MVP。
+
+### 工作原理
+
+- **网页界面**（`web/`）—— 节点编辑器：找图点击、找图输入、按键、延迟、启动软件、判断、循环、变量。
+- **本地引擎**（`src/flowpilot/engine/`）—— 用 OpenCV 模板匹配 + 直接输入控制来执行任务，本地持久化，
+  并注册全局启动/停止快捷键。
+- 浏览器只负责编辑和控制，引擎负责真正的自动化。没有"导出"这一步 —— 任务就保存在引擎里、在那里运行。
+
+### 快速开始（Windows）
+
+**前置条件：** Windows 10/11、[Python 3.11+](https://www.python.org/downloads/)（在 3.13 上测试过）、
+[Node.js 18+](https://nodejs.org/)（在 22 上测试过）。请确认两者都已加入 `PATH` 环境变量。
+
+一条命令 —— 首次运行会自动完成所有准备工作，然后启动引擎并打开浏览器：
+
+```powershell
+.\start.ps1
+```
+
+如果 PowerShell 拒绝运行脚本（提示 `running scripts is disabled` / 禁止运行脚本），改用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+`start.ps1` 会创建虚拟环境、安装依赖、首次运行时构建网页界面，并在 **http://127.0.0.1:8765**
+启动引擎。改动网页界面后用 `.\start.ps1 -Rebuild` 重新构建。在终端里按 `Ctrl+C` 停止。
+
+> 👉 如果遇到任何问题（找不到 Python/Node、端口被占用、快捷键没反应），
+> **[完整部署教程](DEPLOYMENT.md)** 里有每一步的前置条件、手动步骤和常见报错排查。
+
+### 节点类型
+
+| 节点 | 引擎做的事 |
+| --- | --- |
+| 开始 / 结束 `start` / `stop` | 流程的起点与终点 |
+| 找图点击 `find_click` | 在屏幕上找到模板图，点击其中心（左键/右键/双击 + 偏移） |
+| 找图输入 `find_type` | 找到输入框，点击它，再输入文字 |
+| 输入文本 `type_text` | 向当前焦点窗口输入文字 |
+| 按键 `key_press` | 按下某个键或组合键（如 `ctrl+c`） |
+| 延迟 `delay` | 固定或随机等待一段时间 |
+| 启动软件 `launch_app` | 启动一个程序，可选择是否等待 |
+| 判断 `condition` | 根据某模板是否在屏幕上分支（是/否） |
+| 循环 `loop` | 把循环体重复固定次数 |
+| 条件循环 `loop_while` | 当图像/变量条件成立时重复循环体 |
+| 设置变量 `set_var` | 写入一个具名的布尔变量 |
+| 判断变量 `check_var` | 根据具名布尔变量分支（是/否） |
+
+目标图片通过选择或拖拽放到画布上并以 base64 内嵌；引擎在内存里解码并匹配，所以同一个任务在任何机器上
+都能用 —— 没有固定坐标。
+
+### 触发方式
+
+每个任务可以**运行一次 / 多次 / 循环**，可绑定**启动快捷键**和**停止快捷键**；再次按下启动快捷键
+会从头重新开始。停止快捷键 —— 或者把鼠标猛地甩到屏幕角落（PyAutoGUI 安全急停）—— 都能中止任务。
+
+> 在某些系统上，全局快捷键可能需要以**管理员身份**运行终端。工具栏会显示快捷键监听是否生效；
+> 你随时都可以用 ▶ 按钮手动运行任务。
+
+### 为什么用 FlowPilot？
+
+很多自动化工具要么只能写代码，要么绑死在固定像素坐标上，一换屏幕就失效。FlowPilot 让"看得懂屏幕"的
+自动化变得可视化、可编辑，并且以图像而非坐标为目标，所以任务能在不同机器之间通用。
+
+### 安全与负责任地使用
+
+只在你拥有或被授权自动化的软件、账号和设备上使用 FlowPilot。不要用它绕过反作弊系统、验证码、访问控制、
+速率限制或服务条款。停止快捷键和 PyAutoGUI 安全急停（把鼠标甩到角落）是核心保障，请务必保留。
+
+### 参与开发
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+flowpilot-studio
+```
+
+用 `pytest` 运行测试。贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)，路线图见 [ROADMAP.md](ROADMAP.md)。
+
+### 许可证
 
 MIT
