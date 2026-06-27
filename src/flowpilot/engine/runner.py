@@ -94,13 +94,15 @@ def _execute(node: Node, ctx: RunContext) -> tuple[bool, str | None]:
         return False, None
 
     if node.kind == NodeKind.FIND_TYPE:
-        match = _locate_config(node, ctx)
-        if match is None:
-            ctx.log("  未找到输入位置，停止本次运行")
-            return True, None
-        ctx.last_match = match
-        ctx.controller.click(match.center[0], match.center[1])
         text = str(node.config.get("text", ""))
+        has_template = bool(str(node.config.get("templateData", "")).strip())
+        if has_template:
+            match = _locate_config(node, ctx)
+            if match is None:
+                ctx.log("  未找到输入位置，停止本次运行")
+                return True, None
+            ctx.last_match = match
+            ctx.controller.click(match.center[0], match.center[1])
         ctx.log(f"  输入 {len(text)} 个字符")
         ctx.controller.type_text(text)
         return False, None

@@ -81,6 +81,35 @@ def test_find_click_clicks_match_center_with_offset() -> None:
     assert ("click", 115, 202, "left", 1) in controller.events
 
 
+def test_find_type_without_template_types_directly() -> None:
+    start = Node(NodeKind.START, "开始")
+    find = Node(NodeKind.FIND_TYPE, "输入", config={"text": "你好"})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(nodes=[start, find, stop], edges=[Edge(start.id, find.id), Edge(find.id, stop.id)])
+    controller = FakeController()
+
+    status = run_task(task, controller=controller, locator=FakeLocator(None), stop=threading.Event())
+
+    assert status == "completed"
+    assert ("type", "你好") in controller.events
+    assert not any(e[0] == "click" for e in controller.events)
+
+
+def test_find_type_with_template_clicks_then_types() -> None:
+    start = Node(NodeKind.START, "开始")
+    find = Node(NodeKind.FIND_TYPE, "输入", config={"templateData": png_data_url(), "text": "abc"})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(nodes=[start, find, stop], edges=[Edge(start.id, find.id), Edge(find.id, stop.id)])
+    controller = FakeController()
+    locator = FakeLocator(MatchResult(left=10, top=20, width=8, height=6, confidence=0.9))
+
+    run_task(task, controller=controller, locator=locator, stop=threading.Event())
+
+    kinds = [e[0] for e in controller.events]
+    assert kinds.index("click") < kinds.index("type")
+    assert ("type", "abc") in controller.events
+
+
 def test_condition_branches_on_image_presence() -> None:
     def build() -> tuple[Task, FakeController]:
         start = Node(NodeKind.START, "开始")

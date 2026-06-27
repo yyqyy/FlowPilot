@@ -53,7 +53,31 @@ class PyAutoGuiController:
         self._gui.click(x=x, y=y, clicks=clicks, button=gui_button)
 
     def type_text(self, text: str) -> None:
-        self._gui.write(text, interval=0.02)
+        if not text:
+            return
+        # PyAutoGUI's write() can only emit ASCII; anything else (e.g. Chinese)
+        # is silently dropped, so paste non-ASCII text via the clipboard.
+        if text.isascii():
+            self._gui.write(text, interval=0.02)
+            return
+        if self._paste(text):
+            return
+        try:
+            import keyboard
+
+            keyboard.write(text)
+        except Exception:
+            self._gui.write(text, interval=0.02)
+
+    def _paste(self, text: str) -> bool:
+        try:
+            import pyperclip
+
+            pyperclip.copy(text)
+        except Exception:
+            return False
+        self._gui.hotkey("ctrl", "v")
+        return True
 
     def press(self, combo: str) -> None:
         keys = [part.strip().lower() for part in combo.split("+") if part.strip()]
