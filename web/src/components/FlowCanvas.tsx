@@ -26,11 +26,13 @@ export function FlowCanvas() {
   const onEdgesChange = useStore((s) => s.onEdgesChange)
   const onConnect = useStore((s) => s.onConnect)
   const addImageNode = useStore((s) => s.addImageNode)
+  const addNode = useStore((s) => s.addNode)
   const { screenToFlowPosition } = useReactFlow()
   const [dropping, setDropping] = useState(false)
 
   const onDragOver = useCallback((event: React.DragEvent) => {
-    if (Array.from(event.dataTransfer.items).some((i) => i.kind === 'file')) {
+    const types = event.dataTransfer.types
+    if (types.includes('Files') || types.includes('application/flowpilot-node')) {
       event.preventDefault()
       event.dataTransfer.dropEffect = 'copy'
       setDropping(true)
@@ -45,9 +47,15 @@ export function FlowCanvas() {
     (event: React.DragEvent) => {
       event.preventDefault()
       setDropping(false)
-      const images = Array.from(event.dataTransfer.files).filter((f) => f.type.startsWith('image/'))
-      if (images.length === 0) return
       const origin = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+
+      const kind = event.dataTransfer.getData('application/flowpilot-node')
+      if (kind) {
+        addNode(kind as NodeKind, origin)
+        return
+      }
+
+      const images = Array.from(event.dataTransfer.files).filter((f) => f.type.startsWith('image/'))
       images.forEach((file, index) => {
         const reader = new FileReader()
         reader.onload = () =>
@@ -58,7 +66,7 @@ export function FlowCanvas() {
         reader.readAsDataURL(file)
       })
     },
-    [screenToFlowPosition, addImageNode],
+    [screenToFlowPosition, addImageNode, addNode],
   )
 
   return (

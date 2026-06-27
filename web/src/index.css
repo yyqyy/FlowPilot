@@ -434,6 +434,45 @@ body {
   background: #0b1020;
 }
 
+/* ---------- Click-position preview (red dot) ---------- */
+.fp-clickprev {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  margin-top: 8px;
+}
+
+.fp-clickprev img {
+  display: block;
+  width: auto;
+  height: auto;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: #0b1020;
+}
+
+.fp-clickprev-node img {
+  max-width: 100%;
+  max-height: 72px;
+}
+
+.fp-clickprev-inspector img {
+  max-width: 100%;
+  max-height: 180px;
+}
+
+.fp-clickdot {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #fff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35);
+  pointer-events: none;
+}
+
 .fp-image-drop {
   display: flex;
   align-items: center;

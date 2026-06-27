@@ -3,6 +3,7 @@ import { ImagePlus } from 'lucide-react'
 
 import { useStore, type FlowNode } from '../store'
 import { NODE_META, TRIGGER_LABELS, type NodeKind, type TriggerMode } from '../types'
+import { ClickPreview } from './ClickPreview'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -241,6 +242,16 @@ export function Inspector() {
               <input className="fp-input" type="number" value={Number(config.offsetY ?? 0)} onChange={(e) => setCfg('offsetY', Number(e.target.value))} />
             </Field>
           </div>
+          {String(config.templateData ?? '') && (
+            <Field label="点击位置（红点）">
+              <ClickPreview
+                src={String(config.templateData)}
+                offsetX={Number(config.offsetX ?? 0)}
+                offsetY={Number(config.offsetY ?? 0)}
+                variant="inspector"
+              />
+            </Field>
+          )}
         </>
       )}
 

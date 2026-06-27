@@ -47,6 +47,11 @@ export function Palette() {
             key={kind}
             type="button"
             className="fp-palette-item"
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData('application/flowpilot-node', kind)
+              e.dataTransfer.effectAllowed = 'copy'
+            }}
             onClick={() =>
               addNode(kind, { x: 360 + (count % 4) * 30 + index * 4, y: 320 + (count % 6) * 26 })
             }

@@ -2,8 +2,9 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 
 import type { FlowNode } from '../store'
 import { NODE_META, type WorkflowNodeData } from '../types'
+import { ClickPreview } from './ClickPreview'
 
-const WITH_IMAGE = new Set(['find_click', 'find_type', 'condition'])
+const WITH_IMAGE = new Set(['find_type', 'condition'])
 
 function configSummary(data: WorkflowNodeData): string {
   const c = data.config
@@ -36,7 +37,9 @@ function configSummary(data: WorkflowNodeData): string {
 
 export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
   const meta = NODE_META[data.kind]
-  const thumb = WITH_IMAGE.has(data.kind) ? String(data.config.templateData ?? '') : ''
+  const templateData = String(data.config.templateData ?? '')
+  const thumb = WITH_IMAGE.has(data.kind) ? templateData : ''
+  const clickImage = data.kind === 'find_click' ? templateData : ''
   return (
     <div
       className="fp-node"
@@ -54,6 +57,14 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
           {meta.label}
         </div>
         <div className="fp-node-summary">{configSummary(data)}</div>
+        {clickImage && (
+          <ClickPreview
+            src={clickImage}
+            offsetX={Number(data.config.offsetX ?? 0)}
+            offsetY={Number(data.config.offsetY ?? 0)}
+            variant="node"
+          />
+        )}
         {thumb && <img className="fp-node-thumb" src={thumb} alt="" draggable={false} />}
       </div>
 
