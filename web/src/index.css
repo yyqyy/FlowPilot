@@ -1053,6 +1053,75 @@ body {
   cursor: grabbing;
 }
 
+.fp-swipe-point.is-screen {
+  border-radius: 50%;
+  background: #38bdf8;
+}
+
+.fp-swipe-marker {
+  display: contents;
+}
+
+.fp-swipe-box {
+  position: absolute;
+  margin: 0;
+  border: 2px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fp-swipe-sel {
+  position: absolute;
+  border: 1.5px dashed #7dd3fc;
+  background: rgba(56, 189, 248, 0.16);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.fp-swipe-pt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.fp-swipe-pt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fp-swipe-pt-no {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fp-swipe-pt-mode {
+  flex: 1;
+}
+
+.fp-swipe-pt-thumb {
+  width: 44px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: #0b1020;
+}
+
 .fp-swipe-line {
   position: absolute;
   inset: 0;

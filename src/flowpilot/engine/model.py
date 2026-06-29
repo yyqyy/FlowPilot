@@ -204,6 +204,11 @@ class Task:
             Edge.from_dict(e) if _is_new_edge(e) else _migrate_edge(e, kind_by_id)
             for e in raw.get("edges", [])
         ]
+        # Swipe gained 成功/失败 outputs; remap older edges that left it via "then".
+        swipe_ids = {n.id for n in nodes if n.kind == NodeKind.SWIPE}
+        for edge in edges:
+            if edge.kind == "exec" and edge.source in swipe_ids and edge.source_handle == "then":
+                edge.source_handle = "success"
         _ensure_migrated_vars(nodes, variables)
         return cls(
             id=str(raw.get("id") or uuid4().hex),

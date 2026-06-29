@@ -256,22 +256,43 @@ def _execute(node, ctx: RunContext) -> str | None:
 
 
 def _do_swipe(node, ctx: RunContext) -> str:
+    """Press-drag through the configured points. Each point is either anchored to
+    an image found live on screen ("image") or a fixed spot on the screenshot
+    ("screen"). If any image point can't be located, route to "fail"."""
     raw_points = node.config.get("points", []) or []
-    points = [(_float(p, "x", 0.0), _float(p, "y", 0.0)) for p in raw_points]
-    if len(points) < 2:
-        ctx.log("  滑动点不足（至少 2 个），跳过")
-        return "then"
+    if len(raw_points) < 2:
+        ctx.log("  滑动点不足（至少 2 个）→ 失败")
+        return "fail"
+
     shot_w = _float(node.config, "shotW", 0.0)
     shot_h = _float(node.config, "shotH", 0.0)
     screen_w, screen_h = ctx.controller.screen_size()
     scale_x = screen_w / shot_w if shot_w else 1.0
     scale_y = screen_h / shot_h if shot_h else 1.0
-    real = [(round(x * scale_x), round(y * scale_y)) for x, y in points]
+
+    real: list[tuple[int, int]] = []
+    for index, point in enumerate(raw_points, start=1):
+        if str(point.get("mode", "screen")) == "image":
+            template = decode_template(str(point.get("template", "")))
+            if template is None:
+                ctx.log(f"  点 {index} 没有可用的图片 → 失败")
+                return "fail"
+            match = ctx.locator.locate(template, threshold=_float(point, "threshold", 0.85))
+            if match is None:
+                ctx.log(f"  点 {index} 没在屏幕上找到 → 失败")
+                return "fail"
+            x = match.center[0] + _int(point, "offsetX", 0)
+            y = match.center[1] + _int(point, "offsetY", 0)
+        else:
+            x = round(_float(point, "x", 0.0) * scale_x)
+            y = round(_float(point, "y", 0.0) * scale_y)
+        real.append((int(x), int(y)))
+
     durations = [_safe_float(d) for d in node.config.get("durations", []) or []]
     button = str(node.config.get("button", "left"))
     ctx.log(f"  滑动 {len(real)} 个点：{real}")
     ctx.controller.drag_path(real, durations, button=button)
-    return "then"
+    return "success"
 
 
 def _safe_float(value: Any) -> float:

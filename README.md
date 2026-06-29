@@ -69,7 +69,7 @@ web UI. Press `Ctrl+C` in the terminal to stop.
 | 按键 `key_press` | Press a key or combo (e.g. `ctrl+c`) |
 | 延迟 `delay` | Wait a fixed or random time |
 | 启动软件 `launch_app` | Start a program, optionally wait |
-| 滑动 `swipe` | Mark ordered points on a full-screen screenshot, then press-drag through them 1→2→3 with a per-segment duration |
+| 滑动 `swipe` | Lay out an ordered path on a full-screen screenshot; each point is found by image (tracks elements that move) or a fixed spot, then press-drag through them 1→2→3 with per-segment duration (成功 / 失败) |
 | 看图判断 `condition` | Branch on whether a template is on screen (真/假) and expose a **找到** boolean output |
 | 分支 `branch` | Route execution on a boolean data input (真/假) |
 | 重复循环 `loop` | Repeat the body a fixed number of times |
@@ -176,7 +176,7 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 | 按键 `key_press` | 按下某个键或组合键（如 `ctrl+c`） |
 | 延迟 `delay` | 固定或随机等待一段时间 |
 | 启动软件 `launch_app` | 启动一个程序，可选择是否等待 |
-| 滑动 `swipe` | 在整屏截图上按 1→2→3 顺序标点，按住依次滑到末点松开，每段可单独设时长 |
+| 滑动 `swipe` | 在整屏截图上排一条有序路径；每个点可"按图查找"（跟随会移动的元素）或"固定位置"，按住依次 1→2→3 拖动，每段可设时长（成功 / 失败） |
 | 看图判断 `condition` | 根据某模板是否在屏幕上分支（真/假），并提供 **找到** 布尔数据口 |
 | 分支 `branch` | 按输入的布尔数据线分流（真/假） |
 | 重复循环 `loop` | 把循环体重复固定次数 |

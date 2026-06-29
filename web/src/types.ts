@@ -136,8 +136,8 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   swipe: {
     label: '滑动',
     accent: '#14b8a6',
-    hint: '在整屏截图上按序号滑动多个点',
-    pins: [I(), O('then', '完成')],
+    hint: '按序号在多个点之间按住拖动（点可按图查找或固定位置）',
+    pins: [I(), O('success', '成功'), O('fail', '失败')],
   },
   var_get: {
     label: '获取变量',

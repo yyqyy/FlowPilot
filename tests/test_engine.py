@@ -270,7 +270,7 @@ def test_var_get_feeds_string_into_type_text() -> None:
 # --------------------------------------------------------------------------- #
 # swipe
 # --------------------------------------------------------------------------- #
-def test_swipe_scales_points_and_drags() -> None:
+def test_swipe_screen_points_scale_and_drag() -> None:
     start = Node(NodeKind.START, "开始")
     swipe = Node(
         NodeKind.SWIPE,
@@ -278,13 +278,17 @@ def test_swipe_scales_points_and_drags() -> None:
         config={
             "shotW": 960,
             "shotH": 540,
-            "points": [{"x": 10, "y": 20}, {"x": 100, "y": 200}, {"x": 300, "y": 400}],
+            "points": [
+                {"mode": "screen", "x": 10, "y": 20},
+                {"mode": "screen", "x": 100, "y": 200},
+                {"mode": "screen", "x": 300, "y": 400},
+            ],
             "durations": [0.1, 0.2],
             "post_delay": 0,
         },
     )
     stop = Node(NodeKind.STOP, "结束")
-    task = Task(nodes=[start, swipe, stop], edges=[ex(start, "then", swipe), ex(swipe, "then", stop)])
+    task = Task(nodes=[start, swipe, stop], edges=[ex(start, "then", swipe), ex(swipe, "success", stop)])
     controller = FakeController()  # screen 1920x1080 → 2x scale
 
     status = run(task, controller, FakeLocator(None))
@@ -294,17 +298,78 @@ def test_swipe_scales_points_and_drags() -> None:
     assert drags == [("drag", [(20, 40), (200, 400), (600, 800)], [0.1, 0.2], "left")]
 
 
-def test_swipe_with_too_few_points_is_skipped() -> None:
+def test_swipe_image_point_locates_then_drags() -> None:
     start = Node(NodeKind.START, "开始")
-    swipe = Node(NodeKind.SWIPE, "滑动", config={"points": [{"x": 1, "y": 2}], "post_delay": 0})
+    swipe = Node(
+        NodeKind.SWIPE,
+        "滑动",
+        config={
+            "shotW": 960,
+            "shotH": 540,
+            "points": [
+                {"mode": "image", "template": png_data_url(), "threshold": 0.8, "offsetX": 0, "offsetY": 0},
+                {"mode": "screen", "x": 100, "y": 200},
+            ],
+            "durations": [0.5],
+            "post_delay": 0,
+        },
+    )
     stop = Node(NodeKind.STOP, "结束")
-    task = Task(nodes=[start, swipe, stop], edges=[ex(start, "then", swipe), ex(swipe, "then", stop)])
+    task = Task(nodes=[start, swipe, stop], edges=[ex(start, "then", swipe), ex(swipe, "success", stop)])
+    controller = FakeController()  # screen 1920x1080 → 2x scale
+    locator = FakeLocator(MatchResult(left=40, top=50, width=20, height=20, confidence=0.95))
+
+    status = run(task, controller, locator)  # image center (50, 60); screen (100,200)→(200,400)
+
+    assert status == "completed"
+    drags = [e for e in controller.events if e[0] == "drag"]
+    assert drags == [("drag", [(50, 60), (200, 400)], [0.5], "left")]
+
+
+def test_swipe_image_point_not_found_routes_fail() -> None:
+    start = Node(NodeKind.START, "开始")
+    swipe = Node(
+        NodeKind.SWIPE,
+        "滑动",
+        config={
+            "points": [
+                {"mode": "image", "template": png_data_url()},
+                {"mode": "screen", "x": 5, "y": 5},
+            ],
+            "post_delay": 0,
+        },
+    )
+    failed = Node(NodeKind.TYPE_TEXT, "失败", config={"text": "miss", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, swipe, failed, stop],
+        edges=[ex(start, "then", swipe), ex(swipe, "fail", failed), ex(failed, "then", stop)],
+    )
+    controller = FakeController()
+
+    status = run(task, controller, FakeLocator(None))  # template never found
+
+    assert status == "completed"
+    assert not any(e[0] == "drag" for e in controller.events)
+    assert ("type", "miss") in controller.events
+
+
+def test_swipe_too_few_points_routes_fail() -> None:
+    start = Node(NodeKind.START, "开始")
+    swipe = Node(NodeKind.SWIPE, "滑动", config={"points": [{"mode": "screen", "x": 1, "y": 2}], "post_delay": 0})
+    failed = Node(NodeKind.TYPE_TEXT, "失败", config={"text": "few", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, swipe, failed, stop],
+        edges=[ex(start, "then", swipe), ex(swipe, "fail", failed), ex(failed, "then", stop)],
+    )
     controller = FakeController()
 
     status = run(task, controller, FakeLocator(None))
 
     assert status == "completed"
     assert not any(e[0] == "drag" for e in controller.events)
+    assert ("type", "few") in controller.events
 
 
 # --------------------------------------------------------------------------- #
@@ -484,6 +549,24 @@ def test_legacy_task_migrates_to_pin_model() -> None:
     assert all(e.kind == "exec" for e in task.edges)
 
     assert any(v.name == "go" and v.type == "bool" for v in task.variables)
+
+
+def test_swipe_then_edge_migrates_to_success() -> None:
+    raw = {
+        "nodes": [
+            {"id": "s", "kind": "start", "title": "开始"},
+            {"id": "w", "kind": "swipe", "title": "滑", "config": {"points": []}},
+            {"id": "e", "kind": "stop", "title": "结束"},
+        ],
+        "edges": [
+            {"source": "s", "source_handle": "then", "target": "w", "target_handle": "exec", "kind": "exec"},
+            {"source": "w", "source_handle": "then", "target": "e", "target_handle": "exec", "kind": "exec"},
+        ],
+    }
+    task = Task.from_dict(raw)
+    handles = {(e.source, e.target): e.source_handle for e in task.edges}
+    assert handles[("s", "w")] == "then"  # start still leaves via then
+    assert handles[("w", "e")] == "success"  # swipe then → success
 
 
 # --------------------------------------------------------------------------- #

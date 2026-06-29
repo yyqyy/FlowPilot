@@ -42,7 +42,7 @@ npm run build    # type-check + production build into dist/ (served by the engin
 | 按键 key_press | Press a key or combo (e.g. ctrl+c) |
 | 延迟 delay | Wait a fixed or random time |
 | 启动软件 launch_app | Start a program, optionally wait |
-| 滑动 swipe | Mark ordered points on a full-screen screenshot and press-drag through them, per-segment duration |
+| 滑动 swipe | Ordered drag path on a full-screen screenshot; each point is found by image (tracks moving elements) or fixed, with per-segment duration (成功/失败) |
 | 看图判断 condition | Branch on whether a template is on screen (真/假) + 找到 boolean |
 | 分支 branch | Route execution on a boolean data input (真/假) |
 | 重复循环 loop | Repeat the body a fixed number of times |

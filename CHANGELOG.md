@@ -29,11 +29,13 @@ A node-graph overhaul: execution wires, typed data wires, typed variables, and a
   （`var_get` / `var_set`）节点，用数据线连接。
 - `branch` node: route execution on a boolean data input (真/假).
   分支（`branch`）节点：按输入的布尔数据线分流（真/假）。
-- `swipe` node: upload a full-screen screenshot, mark ordered points (add / drag / double-click to
-  delete, with a zoomed preview), and press-drag through them 1→2→3 with a per-segment duration;
-  points are scaled from screenshot to real screen at run time.
-  滑动（`swipe`）节点：上传整屏截图，按顺序标点（可添加 / 拖动 / 双击删除，并有放大预览），
-  按住依次 1→2→3 滑动，每段可单独设时长；运行时按截图→屏幕比例换算坐标。
+- `swipe` node: upload a full-screen screenshot and lay out an ordered path. Each point is either
+  **按图查找** (box a region on the screenshot; it's located on screen at run time, so it tracks
+  elements that move) or **固定位置** (a fixed spot). The engine press-drags through the points
+  1→2→3 with a per-segment duration, reports **成功 / 失败**, and logs which point couldn't be found.
+  滑动（`swipe`）节点：上传整屏截图并排出一条有序路径。每个点可选 **按图查找**（在截图上框出一块，
+  运行时在屏幕上找到它，因此能跟随会移动的元素）或 **固定位置**。引擎按住依次 1→2→3 拖动，每段可单独
+  设时长，给出 **成功 / 失败** 出口，并记录是哪个点没找到。
 
 ### Changed 变更
 
@@ -41,6 +43,11 @@ A node-graph overhaul: execution wires, typed data wires, typed variables, and a
   `variables` list; older saved tasks are migrated on load on a best-effort basis.
   任务现在保存带引脚的连线（`source_handle` / `target_handle` / `kind`）和 `variables` 列表；
   旧任务在加载时尽力自动迁移。
+
+### Fixed 修复
+
+- Windows DPI awareness so clicks, drags, and swipes land on target on scaled displays (125% / 150%).
+  Windows DPI 感知，在缩放显示（125% / 150%）下点击、拖拽、滑动都能落到正确位置。
 
 ### Removed 移除
 

@@ -74,7 +74,7 @@ NODE_PINS: dict[NodeKind, list[Pin]] = {
         _o("body", "循环体"),
         _o("done", "完成"),
     ],
-    NodeKind.SWIPE: [_i(), _o("then", "完成")],
+    NodeKind.SWIPE: [_i(), _o("success", "成功"), _o("fail", "失败")],
     NodeKind.VAR_GET: [_o("value", "值", "var")],
     NodeKind.VAR_SET: [_i(), _i("var", "value", "值"), _o("then", "完成")],
 }

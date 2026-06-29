@@ -49,6 +49,17 @@ class PyAutoGuiController:
     """Real input via PyAutoGUI; app launching via the OS."""
 
     def __init__(self) -> None:
+        # Make the process DPI-aware on Windows so PyAutoGUI's coordinates match
+        # the physical pixels mss captures (otherwise clicks/drags land off-target
+        # on scaled displays at 125%/150%).
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                ctypes.windll.user32.SetProcessDPIAware()
+            except Exception:
+                pass
+
         import pyautogui
 
         pyautogui.FAILSAFE = True  # slam mouse to a corner to abort
