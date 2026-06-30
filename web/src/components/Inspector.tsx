@@ -135,6 +135,46 @@ function ImagePicker({ node }: { node: FlowNode }) {
   )
 }
 
+function RetryFields({ node }: { node: FlowNode }) {
+  const updateConfig = useStore((s) => s.updateConfig)
+  const config = node.data.config
+  const timeout = Number(config.timeout ?? 0)
+  const interval = Number(config.retry_interval ?? 0.5)
+  return (
+    <>
+      <div className="fp-row">
+        <Field label="查找超时（秒，0=只找一次）">
+          <input
+            className="fp-input"
+            type="number"
+            min={0}
+            step={0.5}
+            value={timeout}
+            onChange={(e) => updateConfig(node.id, 'timeout', Math.max(0, Number(e.target.value)))}
+          />
+        </Field>
+        <Field label="重试间隔（秒）">
+          <input
+            className="fp-input"
+            type="number"
+            min={0.05}
+            step={0.1}
+            value={interval}
+            onChange={(e) =>
+              updateConfig(node.id, 'retry_interval', Math.max(0.05, Number(e.target.value)))
+            }
+          />
+        </Field>
+      </div>
+      {timeout > 0 && (
+        <div className="fp-inspector-empty">
+          找不到图片时，每隔「重试间隔」再看一次，最多找 {timeout}s，超时才走「失败 / 假」。
+        </div>
+      )}
+    </>
+  )
+}
+
 function VarPicker({ node }: { node: FlowNode }) {
   const variables = useStore((s) => s.variables)
   const updateConfig = useStore((s) => s.updateConfig)
@@ -305,6 +345,7 @@ export function Inspector() {
       </Field>
 
       {PICKER_KINDS.has(kind) && <ImagePicker node={node} />}
+      {PICKER_KINDS.has(kind) && <RetryFields node={node} />}
 
       {kind === 'find_click' && (
         <>

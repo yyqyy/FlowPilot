@@ -63,14 +63,14 @@ web UI. Press `Ctrl+C` in the terminal to stop.
 | Node | What the engine does |
 | --- | --- |
 | 开始 / 结束 `start` / `stop` | Entry and exit of the graph |
-| 找图点击 `find_click` | Locate a template on screen, click its center (left/right/double + offset). Has **成功 / 失败** execution outputs and a **找到** boolean data output |
-| 找图输入 `find_type` | Locate a field, click it, then type text (or a string fed in by a data wire) |
+| 找图点击 `find_click` | Locate a template on screen, click its center (left/right/double + offset). Has **成功 / 失败** execution outputs and a **找到** boolean data output. Optional **查找超时 / 重试间隔** keep re-looking until the image appears |
+| 找图输入 `find_type` | Locate a field, click it, then type text (or a string fed in by a data wire). Shares the same retry/timeout for finding the field |
 | 输入文本 `type_text` | Type into the focused window |
 | 按键 `key_press` | Press a key or combo (e.g. `ctrl+c`) |
 | 延迟 `delay` | Wait a fixed or random time |
 | 启动软件 `launch_app` | Start a program, optionally wait |
 | 滑动 `swipe` | Lay out an ordered path on a full-screen screenshot; each point is found by image (tracks elements that move) or a fixed spot, then press-drag through them 1→2→3 with per-segment duration (成功 / 失败) |
-| 看图判断 `condition` | Branch on whether a template is on screen (真/假) and expose a **找到** boolean output |
+| 看图判断 `condition` | Branch on whether a template is on screen (真/假) and expose a **找到** boolean output. Optional retry/timeout waits for the image before deciding |
 | 分支 `branch` | Route execution on a boolean data input (真/假) |
 | 重复循环 `loop` | Repeat the body a fixed number of times |
 | 条件循环 `loop_while` | Repeat the body while a boolean wire (or an image) condition holds |
@@ -170,14 +170,14 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 | 节点 | 引擎做的事 |
 | --- | --- |
 | 开始 / 结束 `start` / `stop` | 流程的起点与终点 |
-| 找图点击 `find_click` | 在屏幕上找到模板图，点击其中心（左键/右键/双击 + 偏移）；有 **成功 / 失败** 执行口和 **找到** 布尔数据口 |
-| 找图输入 `find_type` | 找到输入框，点击它，再输入文字（也可由数据线传入文本） |
+| 找图点击 `find_click` | 在屏幕上找到模板图，点击其中心（左键/右键/双击 + 偏移）；有 **成功 / 失败** 执行口和 **找到** 布尔数据口；可设**查找超时 / 重试间隔**，图片没出现就反复查找 |
+| 找图输入 `find_type` | 找到输入框，点击它，再输入文字（也可由数据线传入文本）；找输入框同样支持重试 / 超时 |
 | 输入文本 `type_text` | 向当前焦点窗口输入文字 |
 | 按键 `key_press` | 按下某个键或组合键（如 `ctrl+c`） |
 | 延迟 `delay` | 固定或随机等待一段时间 |
 | 启动软件 `launch_app` | 启动一个程序，可选择是否等待 |
 | 滑动 `swipe` | 在整屏截图上排一条有序路径；每个点可"按图查找"（跟随会移动的元素）或"固定位置"，按住依次 1→2→3 拖动，每段可设时长（成功 / 失败） |
-| 看图判断 `condition` | 根据某模板是否在屏幕上分支（真/假），并提供 **找到** 布尔数据口 |
+| 看图判断 `condition` | 根据某模板是否在屏幕上分支（真/假），并提供 **找到** 布尔数据口；可设重试 / 超时，等图片出现再判断 |
 | 分支 `branch` | 按输入的布尔数据线分流（真/假） |
 | 重复循环 `loop` | 把循环体重复固定次数 |
 | 条件循环 `loop_while` | 当布尔数据线（或图片）条件成立时重复循环体 |

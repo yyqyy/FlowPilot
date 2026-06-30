@@ -8,6 +8,22 @@ project adheres to [Semantic Versioning](https://semver.org/).
 版本号遵循[语义化版本](https://semver.org/)。每次发布请在下方新增一节，并按
 **Added 新增 / Changed 变更 / Fixed 修复 / Removed 移除** 分类记录。
 
+## [0.2.1] - 2026-06-30
+
+Find-image actions can now wait for the screen to settle instead of giving up on
+the first look. 找图类节点现在可以等画面稳定后再判断，而不是看一眼就放弃。
+
+### Added 新增
+
+- Retry & timeout for `find_click` / `find_type` / `condition`: each find-image node
+  has a **查找超时**（seconds to keep looking; `0` keeps the original single-attempt
+  behaviour）and a **重试间隔**. If the template isn't on screen yet, the engine keeps
+  re-checking every interval until it appears or the timeout passes, then routes to
+  **失败 / 假** — so flows survive slow-rendering windows without an extra 延迟 node.
+  为 找图点击 / 找图输入 / 看图判断 增加**查找超时**（持续查找的秒数；`0` 表示只找一次、
+  与旧行为一致）和**重试间隔**。图片还没出现时，引擎每隔一段时间就重新查找，直到找到或超时
+  才走 **失败 / 假** —— 不用再额外加 延迟 节点也能扛住"窗口加载慢"的情况。
+
 ## [0.2.0] - 2026-06-29
 
 A node-graph overhaul: execution wires, typed data wires, typed variables, and a swipe gesture node.
@@ -89,5 +105,6 @@ First public version: a local engine plus a web node editor.
 - Typing Chinese text reliably, and made the target image optional for `find_type`.
   修复中文文本输入；`find_type` 的目标图片改为可选。
 
+[0.2.1]: https://github.com/yyqyy/FlowPilot/releases/tag/v0.2.1
 [0.2.0]: https://github.com/yyqyy/FlowPilot/releases/tag/v0.2.0
 [0.1.0]: https://github.com/yyqyy/FlowPilot/releases/tag/v0.1.0

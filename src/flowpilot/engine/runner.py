@@ -110,6 +110,36 @@ def _locate_config(node, ctx: RunContext) -> MatchResult | None:
     return ctx.locator.locate(template, threshold=threshold)
 
 
+def _locate_with_retry(node, ctx: RunContext) -> MatchResult | None:
+    """Locate a template, retrying until it's found or the node's timeout passes.
+
+    Reads config "timeout" (total seconds to keep looking; 0 = a single attempt,
+    the original behaviour) and "retry_interval" (seconds between attempts). This
+    lets a slow-to-render screen settle before flow routes to 失败/假. Returns the
+    first match, or None if the timeout elapses or stop is signalled without one."""
+    template = decode_template(str(node.config.get("templateData", "")))
+    if template is None:
+        ctx.log(f"[{node.kind}] {node.title}: 没有可用的模板图片")
+        return None
+    threshold = _float(node.config, "threshold", 0.85)
+    timeout = max(0.0, _float(node.config, "timeout", 0.0))
+    interval = max(0.05, _float(node.config, "retry_interval", 0.5))
+    deadline = time.monotonic() + timeout
+    attempt = 0
+    while not ctx.stop.is_set():
+        attempt += 1
+        match = ctx.locator.locate(template, threshold=threshold)
+        if match is not None:
+            if attempt > 1:
+                ctx.log(f"  第 {attempt} 次尝试找到")
+            return match
+        if time.monotonic() + interval >= deadline:
+            return None
+        ctx.log(f"  未找到，{interval:.2f}s 后重试…")
+        interruptible_sleep(interval, ctx.stop)
+    return None
+
+
 def _resolve_input(ctx: RunContext, node_id: str, handle: str, default: Any = None) -> Any:
     """Read the value feeding a node's data input pin.
 
@@ -150,7 +180,7 @@ def _execute(node, ctx: RunContext) -> str | None:
         return "then"
 
     if node.kind == NodeKind.FIND_CLICK:
-        match = _locate_config(node, ctx)
+        match = _locate_with_retry(node, ctx)
         ctx.pin_values[(node.id, "found")] = match is not None
         if match is None:
             ctx.log("  未找到图片 → 失败")
@@ -168,7 +198,7 @@ def _execute(node, ctx: RunContext) -> str | None:
         text = str(_resolve_input(ctx, node.id, "text", node.config.get("text", "")))
         has_template = bool(str(node.config.get("templateData", "")).strip())
         if has_template:
-            match = _locate_config(node, ctx)
+            match = _locate_with_retry(node, ctx)
             ctx.pin_values[(node.id, "found")] = match is not None
             if match is None:
                 ctx.log("  未找到输入位置 → 失败")
@@ -207,7 +237,7 @@ def _execute(node, ctx: RunContext) -> str | None:
         return _do_swipe(node, ctx)
 
     if node.kind == NodeKind.CONDITION:
-        found = _locate_config(node, ctx) is not None
+        found = _locate_with_retry(node, ctx) is not None
         ctx.pin_values[(node.id, "found")] = found
         ctx.log(f"  判断：{'找到' if found else '未找到'}")
         return "true" if found else "false"

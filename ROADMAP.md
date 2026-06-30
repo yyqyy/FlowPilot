@@ -18,8 +18,8 @@
 - [x] Execution wires + data wires with typed ports
 - [x] Success / fail branches on find-image actions
 - [x] Swipe gesture node (multi-point, per-segment duration)
+- [x] Retry and timeout for find-image actions
 - [ ] Multi-monitor region capture
-- [ ] Retry and timeout branches
 
 ## 0.3 — Reusable workflows
 

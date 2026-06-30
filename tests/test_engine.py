@@ -71,6 +71,20 @@ class FakeLocator:
         return self.result
 
 
+class FlakyLocator:
+    """Returns None for the first `misses` calls, then `result` from then on —
+    a screen that takes a few looks before the target renders."""
+
+    def __init__(self, result: MatchResult | None, *, misses: int) -> None:
+        self.result = result
+        self.misses = misses
+        self.calls = 0
+
+    def locate(self, template, *, threshold: float) -> MatchResult | None:
+        self.calls += 1
+        return None if self.calls <= self.misses else self.result
+
+
 class DummyBinder:
     available = False
 
@@ -122,6 +136,108 @@ def test_find_click_fail_takes_fail_branch() -> None:
     assert status == "completed"
     assert ("type", "failed") in controller.events
     assert not any(e[0] == "click" for e in controller.events)
+
+
+def test_find_click_retries_until_image_appears() -> None:
+    start = Node(NodeKind.START, "开始")
+    find = Node(
+        NodeKind.FIND_CLICK,
+        "点按钮",
+        config={
+            "templateData": png_data_url(),
+            "timeout": 5,
+            "retry_interval": 0.01,
+            "post_delay": 0,
+        },
+    )
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(nodes=[start, find, stop], edges=[ex(start, "then", find), ex(find, "success", stop)])
+    controller = FakeController()
+    locator = FlakyLocator(MatchResult(0, 0, 10, 10, 0.95), misses=2)
+
+    status = run_task(task, controller=controller, locator=locator, stop=threading.Event())
+
+    assert status == "completed"
+    assert locator.calls == 3  # two misses, then the hit
+    assert any(e[0] == "click" for e in controller.events)
+
+
+def test_find_click_timeout_routes_fail_after_retrying() -> None:
+    start = Node(NodeKind.START, "开始")
+    find = Node(
+        NodeKind.FIND_CLICK,
+        "点按钮",
+        config={
+            "templateData": png_data_url(),
+            "timeout": 0.1,
+            "retry_interval": 0.01,
+            "post_delay": 0,
+        },
+    )
+    failed = Node(NodeKind.TYPE_TEXT, "失败", config={"text": "failed", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, find, failed, stop],
+        edges=[ex(start, "then", find), ex(find, "fail", failed), ex(failed, "then", stop)],
+    )
+    controller = FakeController()
+    locator = FakeLocator(None)
+
+    status = run_task(task, controller=controller, locator=locator, stop=threading.Event())
+
+    assert status == "completed"
+    assert ("type", "failed") in controller.events
+    assert locator.calls > 1  # it kept looking, didn't give up after one glance
+
+
+def test_find_click_no_timeout_looks_once() -> None:
+    start = Node(NodeKind.START, "开始")
+    find = Node(NodeKind.FIND_CLICK, "点按钮", config={"templateData": png_data_url(), "post_delay": 0})
+    failed = Node(NodeKind.TYPE_TEXT, "失败", config={"text": "failed", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, find, failed, stop],
+        edges=[ex(start, "then", find), ex(find, "fail", failed), ex(failed, "then", stop)],
+    )
+    locator = FakeLocator(None)
+
+    run_task(task, controller=FakeController(), locator=locator, stop=threading.Event())
+
+    assert locator.calls == 1  # default timeout 0 keeps the original single-attempt behaviour
+
+
+def test_condition_retries_until_image_appears() -> None:
+    start = Node(NodeKind.START, "开始")
+    cond = Node(
+        NodeKind.CONDITION,
+        "看图",
+        config={
+            "templateData": png_data_url(),
+            "timeout": 5,
+            "retry_interval": 0.01,
+            "post_delay": 0,
+        },
+    )
+    yes = Node(NodeKind.TYPE_TEXT, "真", config={"text": "yes", "post_delay": 0})
+    no = Node(NodeKind.TYPE_TEXT, "假", config={"text": "no", "post_delay": 0})
+    stop = Node(NodeKind.STOP, "结束")
+    task = Task(
+        nodes=[start, cond, yes, no, stop],
+        edges=[
+            ex(start, "then", cond),
+            ex(cond, "true", yes),
+            ex(cond, "false", no),
+            ex(yes, "then", stop),
+            ex(no, "then", stop),
+        ],
+    )
+    controller = FakeController()
+    locator = FlakyLocator(MatchResult(0, 0, 4, 4, 0.9), misses=3)
+
+    run_task(task, controller=controller, locator=locator, stop=threading.Event())
+
+    assert ("type", "yes") in controller.events
+    assert ("type", "no") not in controller.events
 
 
 def test_find_type_without_template_types_directly() -> None:

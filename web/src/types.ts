@@ -236,9 +236,9 @@ export function defaultConfig(kind: NodeKind): Record<string, unknown> {
   const post_delay = defaultPostDelay(kind)
   switch (kind) {
     case 'find_click':
-      return { templateData: '', template: '', threshold: 0.85, button: 'left', offsetX: 0, offsetY: 0, post_delay }
+      return { templateData: '', template: '', threshold: 0.85, button: 'left', offsetX: 0, offsetY: 0, timeout: 0, retry_interval: 0.5, post_delay }
     case 'find_type':
-      return { templateData: '', template: '', threshold: 0.85, text: '', post_delay }
+      return { templateData: '', template: '', threshold: 0.85, text: '', timeout: 0, retry_interval: 0.5, post_delay }
     case 'type_text':
       return { text: '', post_delay }
     case 'key_press':
@@ -248,7 +248,7 @@ export function defaultConfig(kind: NodeKind): Record<string, unknown> {
     case 'launch_app':
       return { path: '', args: '', wait_seconds: 1, post_delay }
     case 'condition':
-      return { templateData: '', template: '', threshold: 0.85, post_delay }
+      return { templateData: '', template: '', threshold: 0.85, timeout: 0, retry_interval: 0.5, post_delay }
     case 'branch':
       return { post_delay }
     case 'loop':
