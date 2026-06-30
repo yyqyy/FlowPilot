@@ -8,7 +8,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 版本号遵循[语义化版本](https://semver.org/)。每次发布请在下方新增一节，并按
 **Added 新增 / Changed 变更 / Fixed 修复 / Removed 移除** 分类记录。
 
-## [0.2.0] - 2026-06-27
+## [0.2.0] - 2026-06-29
 
 A node-graph overhaul: execution wires, typed data wires, typed variables, and a swipe gesture node.
 节点图大改：执行线、带类型的数据线、带类型的变量，以及全新的滑动手势节点。
